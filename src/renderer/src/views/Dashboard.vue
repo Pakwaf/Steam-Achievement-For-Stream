@@ -228,9 +228,9 @@
                 </div>
               </div>
               <div class="obs-alt-url">
-                <span class="alt-label">Alternative IP :</span>
-                <code class="alt-code" @click="copyObsUrlIpv4" title="Cliquer pour copier">http://127.0.0.1:8080/obs</code>
-                <span v-if="obsIpv4Copied" class="copied-badge">Copié !</span>
+                <span class="alt-label">Nom d'hôte alternatif :</span>
+                <code class="alt-code" @click="copyObsUrlLocalhost" title="Cliquer pour copier">http://localhost:8080/obs</code>
+                <span v-if="obsLocalhostCopied" class="copied-badge">Copié !</span>
               </div>
               <div class="obs-meta-stats">
                 <span>Sources OBS connectées : <strong :class="{ 'connected-count': (obsStatus?.connectedClients || 0) > 0 }">{{ obsStatus?.connectedClients || 0 }}</strong></span>
@@ -366,13 +366,13 @@ const isLoading = ref(false)
 const errorMessage = ref(null)
 const copied = ref(false)
 const obsCopied = ref(false)
-const obsIpv4Copied = ref(false)
+const obsLocalhostCopied = ref(false)
 const isElectron = ref(typeof window !== 'undefined' && !!window.steamAPI)
 
 // État du tracker, de l'OBS et des succès
 const trackerStatus = ref(null)
 const obsStatus = ref({ isRunning: true, port: 8080, connectedClients: 0 })
-const obsUrl = ref('http://localhost:8080/obs')
+const obsUrl = ref('http://127.0.0.1:8080/obs')
 const activeNotification = ref(null)
 const unlockedHistory = ref([])
 const isSimulating = ref(false)
@@ -538,11 +538,11 @@ function copyObsUrl() {
   }, 2000)
 }
 
-function copyObsUrlIpv4() {
-  navigator.clipboard.writeText('http://127.0.0.1:8080/obs')
-  obsIpv4Copied.value = true
+function copyObsUrlLocalhost() {
+  navigator.clipboard.writeText('http://localhost:8080/obs')
+  obsLocalhostCopied.value = true
   setTimeout(() => {
-    obsIpv4Copied.value = false
+    obsLocalhostCopied.value = false
   }, 2000)
 }
 

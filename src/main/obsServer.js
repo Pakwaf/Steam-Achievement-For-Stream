@@ -191,8 +191,8 @@ export class ObsServer {
       status: this.isRunning ? 'online' : 'offline',
       isRunning: this.isRunning,
       port: this.port,
-      obsUrl: `http://localhost:${this.port}/obs`,
-      obsUrlIpv4: `http://127.0.0.1:${this.port}/obs`,
+      obsUrl: `http://127.0.0.1:${this.port}/obs`,
+      obsUrlLocalhost: `http://localhost:${this.port}/obs`,
       connectedClients: this.clients.size,
       lastAchievement: this.lastAchievement
     }
