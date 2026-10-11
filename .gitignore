@@ -17,8 +17,8 @@ dist
 dist-ssr
 out
 release
-!build/
-!build/**
+target
+src-tauri/target
 *.local
 
 # Editor directories and files
