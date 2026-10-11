@@ -69,5 +69,19 @@ contextBridge.exposeInMainWorld('steamAPI', {
    * Récupère le statut du serveur OBS local (port, clients connectés, URL)
    * @returns {Promise<{isRunning: boolean, port: number, obsUrl: string, connectedClients: number}>}
    */
-  getObsStatus: () => ipcRenderer.invoke('obs:get-server-status')
+  getObsStatus: () => ipcRenderer.invoke('obs:get-server-status'),
+
+  /**
+   * Écoute les changements de statut du serveur OBS (connexions/déconnexions de sources)
+   * @param {Function} callback
+   * @returns {Function} Fonction de désinscription
+   */
+  onObsStatusChanged: (callback) => {
+    const handler = (_event, status) => callback(status)
+    ipcRenderer.on('obs:status-changed', handler)
+    return () => {
+      ipcRenderer.removeListener('obs:status-changed', handler)
+    }
+  }
 })
+

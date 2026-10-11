@@ -227,9 +227,14 @@
                   </button>
                 </div>
               </div>
+              <div class="obs-alt-url">
+                <span class="alt-label">Alternative IP :</span>
+                <code class="alt-code" @click="copyObsUrlIpv4" title="Cliquer pour copier">http://127.0.0.1:8080/obs</code>
+                <span v-if="obsIpv4Copied" class="copied-badge">Copié !</span>
+              </div>
               <div class="obs-meta-stats">
-                <span>Sources OBS connectées : <strong>{{ obsStatus?.connectedClients || 0 }}</strong></span>
-                <span>Protocole : <strong>WebSocket (ws://localhost:8080)</strong></span>
+                <span>Sources OBS connectées : <strong :class="{ 'connected-count': (obsStatus?.connectedClients || 0) > 0 }">{{ obsStatus?.connectedClients || 0 }}</strong></span>
+                <span>Protocole : <strong>WebSocket (:8080)</strong></span>
               </div>
             </div>
           </div>
@@ -354,13 +359,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const currentUser = ref(null)
 const isLoading = ref(false)
 const errorMessage = ref(null)
 const copied = ref(false)
 const obsCopied = ref(false)
+const obsIpv4Copied = ref(false)
 const isElectron = ref(typeof window !== 'undefined' && !!window.steamAPI)
 
 // État du tracker, de l'OBS et des succès
@@ -371,6 +377,7 @@ const activeNotification = ref(null)
 const unlockedHistory = ref([])
 const isSimulating = ref(false)
 let toastTimer = null
+let obsPollInterval = null
 
 const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
@@ -387,11 +394,13 @@ onMounted(async () => {
       const status = await window.steamAPI.getTrackerStatus()
       trackerStatus.value = status
 
-      // 3. Statut du serveur OBS
+      // 3. Statut initial du serveur OBS
       if (window.steamAPI.getObsStatus) {
         const obs = await window.steamAPI.getObsStatus()
-        obsStatus.value = obs
-        if (obs?.obsUrl) obsUrl.value = obs.obsUrl
+        if (obs) {
+          obsStatus.value = obs
+          if (obs.obsUrl) obsUrl.value = obs.obsUrl
+        }
       }
     } catch (err) {
       console.error('Erreur initialisation dashboard:', err)
@@ -406,7 +415,34 @@ onMounted(async () => {
     window.steamAPI.onAchievementUnlocked((achievement) => {
       triggerAchievementToast(achievement)
     })
+
+    // Écoute en temps réel des connexions/déconnexions de sources OBS
+    if (window.steamAPI.onObsStatusChanged) {
+      window.steamAPI.onObsStatusChanged((obs) => {
+        if (obs) {
+          obsStatus.value = obs
+          if (obs.obsUrl) obsUrl.value = obs.obsUrl
+        }
+      })
+    }
+
+    // Polling de secours toutes les 2.5 secondes pour synchronisation instantanée
+    obsPollInterval = setInterval(async () => {
+      if (window.steamAPI?.getObsStatus) {
+        try {
+          const obs = await window.steamAPI.getObsStatus()
+          if (obs) obsStatus.value = obs
+        } catch {
+          // ignore
+        }
+      }
+    }, 2500)
   }
+})
+
+onUnmounted(() => {
+  if (obsPollInterval) clearInterval(obsPollInterval)
+  if (toastTimer) clearTimeout(toastTimer)
 })
 
 // Déclenche l'affichage du toast de notification de preview dans le dashboard
@@ -499,6 +535,14 @@ function copyObsUrl() {
   obsCopied.value = true
   setTimeout(() => {
     obsCopied.value = false
+  }, 2000)
+}
+
+function copyObsUrlIpv4() {
+  navigator.clipboard.writeText('http://127.0.0.1:8080/obs')
+  obsIpv4Copied.value = true
+  setTimeout(() => {
+    obsIpv4Copied.value = false
   }, 2000)
 }
 
@@ -1326,6 +1370,36 @@ function onIconError(e) {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.obs-alt-url {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--steam-text-muted);
+}
+
+.alt-code {
+  font-family: monospace;
+  color: #66c0f4;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px dashed rgba(102, 192, 244, 0.25);
+  transition: var(--transition-smooth);
+}
+
+.alt-code:hover {
+  border-color: var(--steam-blue);
+  color: #fff;
+}
+
+.copied-badge {
+  color: #a1cd44;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
 .obs-meta-stats {
   display: flex;
   justify-content: space-between;
@@ -1337,6 +1411,11 @@ function onIconError(e) {
 
 .obs-meta-stats strong {
   color: #fff;
+}
+
+.obs-meta-stats strong.connected-count {
+  color: #a1cd44;
+  text-shadow: 0 0 8px rgba(161, 205, 68, 0.5);
 }
 
 /* ========================================================

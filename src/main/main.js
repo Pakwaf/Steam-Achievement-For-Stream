@@ -180,8 +180,15 @@ app.whenReady().then(() => {
   createOverlayWindow()
 
   // 2. Démarrer le serveur local OBS Express & WebSocket (port 8080)
-  obsServer.start(8080, async (appId, code) => {
-    await achievementTracker.simulateUnlock(appId, code)
+  obsServer.start(8080, {
+    onSimulateRequest: async (appId, code) => {
+      await achievementTracker.simulateUnlock(appId, code)
+    },
+    onStatusChange: (status) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('obs:status-changed', status)
+      }
+    }
   })
 
   // 3. Démarrer l'écoute des logs Steam en temps réel
