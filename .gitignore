@@ -16,8 +16,9 @@ node_modules
 dist
 dist-ssr
 out
-build
 release
+!build/
+!build/**
 *.local
 
 # Editor directories and files
