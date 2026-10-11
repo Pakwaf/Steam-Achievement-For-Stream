@@ -17,6 +17,10 @@ class SteamAuthService {
     return this.currentUser
   }
 
+  setCurrentUser(user) {
+    this.currentUser = user
+  }
+
   /**
    * Déconnecte l'utilisateur courant
    */

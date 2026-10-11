@@ -49,7 +49,8 @@
         <!-- Tracker status -->
         <div class="tracker-status-chip" :class="{ active: trackerStatus?.isTracking }">
           <span class="chip-dot"></span>
-          <span>{{ trackerStatus?.isTracking ? 'Tracker Actif (Logs)' : 'Tracker Inactif' }}</span>
+          <span v-if="trackerStatus?.activeGameName">En jeu : {{ trackerStatus.activeGameName }}</span>
+          <span v-else>{{ trackerStatus?.isTracking ? 'Tracker Actif (En attente de jeu)' : 'Tracker Inactif' }}</span>
         </div>
         <!-- Auth status -->
         <div class="system-status">
@@ -680,12 +681,21 @@ onMounted(async () => {
       })
     }
 
-    // Polling de secours toutes les 2.5 secondes pour synchronisation instantanée
+    // Polling de secours toutes les 2.5 secondes pour synchronisation instantanée (OBS + Tracker jeu)
     obsPollInterval = setInterval(async () => {
       if (window.steamAPI?.getObsStatus) {
         try {
           const obs = await window.steamAPI.getObsStatus()
           if (obs) obsStatus.value = obs
+        } catch {
+          // ignore
+        }
+      }
+
+      if (window.steamAPI?.getTrackerStatus) {
+        try {
+          const st = await window.steamAPI.getTrackerStatus()
+          if (st) trackerStatus.value = st
         } catch {
           // ignore
         }

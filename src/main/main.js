@@ -136,6 +136,10 @@ function registerIpcHandlers() {
   ipcMain.handle('steam:login', async () => {
     try {
       const user = await steamAuth.authenticate(mainWindow)
+      if (user) {
+        settingsService.saveCurrentUser(user)
+        achievementTracker.setSteamUser(user)
+      }
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('steam:auth-status-changed', user)
       }
@@ -153,6 +157,8 @@ function registerIpcHandlers() {
 
   // 3. Déconnexion
   ipcMain.handle('steam:logout', () => {
+    settingsService.saveCurrentUser(null)
+    achievementTracker.setSteamUser(null)
     const result = steamAuth.logout()
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('steam:auth-status-changed', null)
@@ -344,7 +350,9 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('steam:save-api-key', (_event, key) => {
-    return settingsService.saveSteamApiKey(key)
+    const res = settingsService.saveSteamApiKey(key)
+    achievementTracker.setApiKey(res.apiKey)
+    return res
   })
 
   // 19. Diffusion d'un faux succès de test (uniquement sur l'Overlay Écran et OBS)
@@ -381,6 +389,14 @@ function registerIpcHandlers() {
 app.whenReady().then(() => {
   settingsService.init()
   customizationService.init()
+
+  // Restaurer la session utilisateur sauvegardée si existante
+  const savedUser = settingsService.getCurrentUser()
+  if (savedUser) {
+    steamAuth.setCurrentUser(savedUser)
+    achievementTracker.setSteamUser(savedUser)
+  }
+
   registerIpcHandlers()
 
   // 1. Démarrer les fenêtres

@@ -90,6 +90,16 @@ export class SettingsService {
       hasKey: Boolean(trimmed && trimmed.length >= 8)
     }
   }
+
+  getCurrentUser() {
+    return this.settings.currentUser || null
+  }
+
+  saveCurrentUser(user) {
+    this.settings.currentUser = user || null
+    this.persist()
+    return { success: true }
+  }
 }
 
 export const settingsService = new SettingsService()

@@ -2,21 +2,138 @@ import 'dotenv/config'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execSync } from 'node:child_process'
+import { settingsService } from './settingsService.js'
 
 /**
- * Service de détection et d'écoute des succès Steam en temps réel via les logs locaux
+ * Service de détection et d'écoute des succès Steam en temps réel
+ * Mode Hybride : Événements logs locaux (stats_log.txt) + Steam Web API intelligente
  */
 export class AchievementTracker {
   constructor() {
     this.steamPath = null
+    this.steamId = null
+    this.apiKey = null
     this.watchedFiles = []
     this.isTracking = false
     this.fileOffsets = new Map() // chemin -> position de lecture actuelle (en octets)
     this.remainders = new Map() // chemin -> reste de ligne non terminée
-    this.watchers = [] // instances de fs.watchFile
+    this.watchers = []
+
+    // État du jeu en cours
+    this.activeAppId = null
+    this.activeGameName = null
+    this.knownUnlockedAchievements = new Map() // appId -> Set d'apiName déjà débloqués
+    this.gameInitialized = new Map() // appId -> boolean (vrai quand l'état de départ est indexé)
+    this.isCheckingAchievements = false
+
+    // Timers de surveillance
+    this.summaryPollTimer = null
+    this.gamePollTimer = null
+
+    // Caches métadonnées
     this.schemaCache = new Map() // appId -> schéma complet du jeu
     this.gameNameCache = new Map() // appId -> nom du jeu (Store API fallback)
     this.onUnlockCallback = null
+  }
+
+  /**
+   * Retourne la clé Steam API active (du service paramètres ou de l'environnement)
+   * @returns {string}
+   */
+  getEffectiveApiKey() {
+    if (this.apiKey && this.apiKey.trim().length >= 8) {
+      return this.apiKey.trim()
+    }
+    const settingsKey = settingsService.getSteamApiKey()?.apiKey
+    if (settingsKey && settingsKey.trim().length >= 8) {
+      return settingsKey.trim()
+    }
+    return (process.env.STEAM_API_KEY || '').trim()
+  }
+
+  /**
+   * Retourne le SteamID64 actif (du profil connecté ou auto-détecté dans loginusers.vdf)
+   * @returns {string|null}
+   */
+  getEffectiveSteamId() {
+    if (this.steamId && /^\d{17}$/.test(this.steamId)) {
+      return this.steamId
+    }
+    const savedUser = settingsService.getCurrentUser()
+    if (savedUser?.steamId && /^\d{17}$/.test(savedUser.steamId)) {
+      this.steamId = savedUser.steamId
+      return this.steamId
+    }
+    const autoDetected = this.detectActiveSteamId(this.steamPath)
+    if (autoDetected) {
+      this.steamId = autoDetected
+      return this.steamId
+    }
+    return null
+  }
+
+  /**
+   * Met à jour le profil Steam de l'utilisateur actif
+   * @param {Object} user 
+   */
+  setSteamUser(user) {
+    if (user?.steamId) {
+      this.steamId = user.steamId
+      console.log(`[AchievementTracker] 👤 Utilisateur Steam associé : ${user.personaName || user.steamId} (${user.steamId})`)
+    } else {
+      this.steamId = null
+    }
+  }
+
+  /**
+   * Met à jour la clé Steam API
+   * @param {string} key 
+   */
+  setApiKey(key) {
+    if (key && typeof key === 'string') {
+      this.apiKey = key.trim()
+      console.log(`[AchievementTracker] 🔑 Clé Steam API actualisée : ${this.apiKey.substring(0, 4)}...`)
+    }
+  }
+
+  /**
+   * Détecte automatiquement le SteamID64 du joueur actif via loginusers.vdf de Steam
+   * @param {string} steamPath 
+   * @returns {string|null}
+   */
+  detectActiveSteamId(steamPath) {
+    if (!steamPath) return null
+    const loginUsersPath = path.join(steamPath, 'config', 'loginusers.vdf')
+    if (!fs.existsSync(loginUsersPath)) return null
+
+    try {
+      const content = fs.readFileSync(loginUsersPath, 'utf8')
+      const userMatches = [...content.matchAll(/"(7656\d+)"\s*\{([\s\S]*?)\}/g)]
+      let autoLoginSteamId = null
+      let bestSteamId = null
+      let highestTimestamp = 0
+
+      for (const match of userMatches) {
+        const steamId = match[1]
+        const block = match[2]
+        if (block.includes('"AutoLogin"\t\t"1"') || block.includes('"AutoLogin" "1"') || block.includes('"MostRecent"\t\t"1"')) {
+          autoLoginSteamId = steamId
+        }
+        const timeMatch = block.match(/"Timestamp"\s*"(\d+)"/)
+        if (timeMatch) {
+          const ts = parseInt(timeMatch[1], 10)
+          if (ts > highestTimestamp) {
+            highestTimestamp = ts
+            bestSteamId = steamId
+          }
+        }
+      }
+
+      return autoLoginSteamId || bestSteamId
+    } catch (err) {
+      console.warn('[AchievementTracker] Erreur lecture loginusers.vdf:', err.message)
+      return null
+    }
   }
 
   /**
@@ -24,12 +141,10 @@ export class AchievementTracker {
    * @returns {string|null} Chemin racine de Steam
    */
   detectSteamPath() {
-    // 1. Variable d'environnement explicite (ex: .env ou variable système)
     if (process.env.STEAM_PATH && fs.existsSync(process.env.STEAM_PATH)) {
       return path.normalize(process.env.STEAM_PATH)
     }
 
-    // 2. Détection Windows via le Registre
     if (process.platform === 'win32') {
       try {
         const stdout = execSync('reg query "HKCU\\Software\\Valve\\Steam" /v SteamPath', {
@@ -42,7 +157,6 @@ export class AchievementTracker {
           if (fs.existsSync(regPath)) return regPath
         }
       } catch {
-        // En cas d'échec du registre HKCU, on tente le chemin d'installation global HKLM
         try {
           const stdout = execSync('reg query "HKLM\\Software\\WOW6432Node\\Valve\\Steam" /v InstallPath', {
             encoding: 'utf8',
@@ -53,12 +167,9 @@ export class AchievementTracker {
             const regPath = path.normalize(match[1].trim())
             if (fs.existsSync(regPath)) return regPath
           }
-        } catch {
-          // Poursuivre vers les chemins par défaut
-        }
+        } catch {}
       }
 
-      // Chemins par défaut Windows courants
       const defaultWindowsPaths = [
         'C:\\Program Files (x86)\\Steam',
         'C:\\Program Files\\Steam',
@@ -70,13 +181,11 @@ export class AchievementTracker {
       }
     }
 
-    // 3. Détection macOS
     if (process.platform === 'darwin') {
       const macPath = path.join(process.env.HOME || '', 'Library/Application Support/Steam')
       if (fs.existsSync(macPath)) return macPath
     }
 
-    // 4. Détection Linux
     if (process.platform === 'linux') {
       const linuxPaths = [
         path.join(process.env.HOME || '', '.local/share/Steam'),
@@ -110,7 +219,6 @@ export class AchievementTracker {
       }
     }
 
-    // Si aucun n'existe encore (par ex. Steam jamais lancé), on surveille le fichier standard par anticipation
     if (found.length === 0) {
       found.push(path.join(logsDir, 'stats_log.txt'))
     }
@@ -119,8 +227,8 @@ export class AchievementTracker {
   }
 
   /**
-   * Démarre l'écoute (tail) des logs Steam en temps réel
-   * @param {Function} onUnlockCallback - Callback appelé avec les métadonnées complètes du succès
+   * Démarre la détection des succès en temps réel
+   * @param {Function} onUnlockCallback
    */
   start(onUnlockCallback) {
     if (this.isTracking) return
@@ -132,19 +240,29 @@ export class AchievementTracker {
       return
     }
 
+    this.steamId = this.getEffectiveSteamId()
+    this.apiKey = this.getEffectiveApiKey()
+
+    console.log(`[AchievementTracker] 🔍 Steam détecté dans : ${this.steamPath}`)
+    console.log(`[AchievementTracker] 👤 SteamID64 actif : ${this.steamId || 'Non détecté'}`)
+    console.log(`[AchievementTracker] 🔑 Clé API Steam présente : ${Boolean(this.apiKey)}`)
+
+    // 1. Surveillance temps réel du fichier de log stats_log.txt
     this.watchedFiles = this.findLogFiles(this.steamPath)
-    console.log(`[AchievementTracker] Steam détecté dans : ${this.steamPath}`)
-    console.log(`[AchievementTracker] Fichiers surveillés :`, this.watchedFiles)
+    console.log(`[AchievementTracker] 📄 Fichiers de log surveillés :`, this.watchedFiles)
 
     for (const filePath of this.watchedFiles) {
       this.attachFileWatcher(filePath)
     }
 
+    // 2. Démarrage de la détection du jeu actif via Steam Web API
+    this.startActiveGameDetection()
+
     this.isTracking = true
   }
 
   /**
-   * Arrête l'écoute des fichiers de logs
+   * Arrête toute la surveillance
    */
   stop() {
     for (const filePath of this.watchedFiles) {
@@ -154,9 +272,167 @@ export class AchievementTracker {
     }
     this.watchedFiles = []
     this.watchers = []
+
+    if (this.summaryPollTimer) {
+      clearInterval(this.summaryPollTimer)
+      this.summaryPollTimer = null
+    }
+
+    if (this.gamePollTimer) {
+      clearInterval(this.gamePollTimer)
+      this.gamePollTimer = null
+    }
+
     this.isTracking = false
     this.onUnlockCallback = null
-    console.log('[AchievementTracker] Écoute des logs arrêtée.')
+    console.log('[AchievementTracker] Surveillance arrêtée.')
+  }
+
+  /**
+   * Boucle légère de détection du jeu en cours (vérification toutes les 3.5s)
+   */
+  startActiveGameDetection() {
+    if (this.summaryPollTimer) clearInterval(this.summaryPollTimer)
+
+    // Exécution immédiate
+    this.pollActiveGame()
+
+    // Vérification périodique toutes les 3.5 secondes
+    this.summaryPollTimer = setInterval(() => {
+      this.pollActiveGame()
+    }, 3500)
+  }
+
+  /**
+   * Interroge GetPlayerSummaries pour savoir si un jeu Steam est en cours d'exécution
+   */
+  async pollActiveGame() {
+    const apiKey = this.getEffectiveApiKey()
+    const steamId = this.getEffectiveSteamId()
+    if (!apiKey || !steamId) return
+
+    try {
+      const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamId}`
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        const player = data?.response?.players?.[0]
+        const gameId = player?.gameid ? String(player.gameid).trim() : null
+        const gameName = player?.gameextrainfo || null
+
+        if (gameId && gameId !== this.activeAppId) {
+          await this.onGameStarted(gameId, gameName)
+        } else if (!gameId && this.activeAppId) {
+          this.onGameStopped(this.activeAppId)
+        }
+      }
+    } catch {
+      // Ignorer les micro-coupures réseau
+    }
+  }
+
+  /**
+   * Déclenché quand un jeu Steam démarre
+   * @param {string} appId 
+   * @param {string} [gameName] 
+   */
+  async onGameStarted(appId, gameName) {
+    if (!appId) return
+    if (this.activeAppId === appId && this.gameInitialized.get(appId)) return
+
+    this.activeAppId = appId
+    this.activeGameName = gameName || await this.resolveGameName(appId)
+
+    console.log(`[AchievementTracker] 🎮 Jeu détecté en cours d'exécution : ${this.activeGameName} (AppID ${appId})`)
+
+    // 1. Initialiser le jeu : indexer l'état actuel des succès
+    await this.checkPlayerAchievements(appId, true)
+
+    // 2. Démarrer la surveillance rapprochée pendant la partie (toutes les 1.8 secondes)
+    if (this.gamePollTimer) clearInterval(this.gamePollTimer)
+    this.gamePollTimer = setInterval(async () => {
+      if (this.activeAppId === appId) {
+        await this.checkPlayerAchievements(appId, false)
+      }
+    }, 1800)
+  }
+
+  /**
+   * Déclenché quand un jeu Steam s'arrête
+   * @param {string} appId 
+   */
+  onGameStopped(appId) {
+    console.log(`[AchievementTracker] ⏹️ Fin de session de jeu pour ${this.activeGameName || appId}`)
+    if (this.gamePollTimer) {
+      clearInterval(this.gamePollTimer)
+      this.gamePollTimer = null
+    }
+    this.activeAppId = null
+    this.activeGameName = null
+  }
+
+  /**
+   * Interroge GetPlayerAchievements pour comparer l'état actuel et détecter les déblocages
+   * @param {string} appId 
+   * @param {boolean} isInitial - Si true, indexe les succès existants sans déclencher d'alerte
+   */
+  async checkPlayerAchievements(appId, isInitial = false) {
+    if (!appId) return
+    const apiKey = this.getEffectiveApiKey()
+    const steamId = this.getEffectiveSteamId()
+    if (!apiKey || !steamId) return
+
+    if (this.isCheckingAchievements) return
+    this.isCheckingAchievements = true
+
+    try {
+      const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${apiKey}&steamid=${steamId}&l=french`
+      const res = await fetch(url)
+      if (!res.ok) return
+
+      const data = await res.json()
+      const achievements = data?.playerstats?.achievements || []
+      const resolvedGameName = data?.playerstats?.gameName || this.activeGameName || `AppID ${appId}`
+      if (resolvedGameName && !this.activeGameName) {
+        this.activeGameName = resolvedGameName
+      }
+
+      let knownSet = this.knownUnlockedAchievements.get(appId)
+      if (!knownSet) {
+        knownSet = new Set()
+        this.knownUnlockedAchievements.set(appId, knownSet)
+      }
+
+      // Initialisation : on mémorise tous les succès déjà débloqués par le joueur
+      if (isInitial || !this.gameInitialized.get(appId)) {
+        for (const a of achievements) {
+          if (a.achieved === 1) {
+            knownSet.add(a.apiname)
+          }
+        }
+        this.gameInitialized.set(appId, true)
+        console.log(`[AchievementTracker] ✅ Suivi des succès enclenché pour "${resolvedGameName}" (${knownSet.size}/${achievements.length} déjà débloqués).`)
+        return
+      }
+
+      // Recherche des nouveaux succès débloqués depuis la dernière vérification
+      for (const a of achievements) {
+        if (a.achieved === 1 && !knownSet.has(a.apiname)) {
+          // NOUVEAU SUCCÈS DÉBLOQUÉ !
+          knownSet.add(a.apiname)
+          console.log(`[AchievementTracker] 🏆 NOUVEAU SUCCÈS DÉBLOQUÉ : "${a.name || a.apiname}" dans ${resolvedGameName} !`)
+
+          const meta = await this.getAchievementMetadata(appId, a.apiname, a.name, a.description, resolvedGameName)
+          if (this.onUnlockCallback) {
+            this.onUnlockCallback(meta)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[AchievementTracker] Erreur lors de la vérification des succès pour AppID ${appId}:`, err.message)
+    } finally {
+      this.isCheckingAchievements = false
+    }
   }
 
   /**
@@ -164,7 +440,6 @@ export class AchievementTracker {
    * @param {string} filePath 
    */
   attachFileWatcher(filePath) {
-    // Si le fichier existe déjà, on commence à lire depuis la FIN actuelle (pour ne pas rejouer les anciens succès)
     let initialOffset = 0
     if (fs.existsSync(filePath)) {
       try {
@@ -178,7 +453,7 @@ export class AchievementTracker {
     this.fileOffsets.set(filePath, initialOffset)
     this.remainders.set(filePath, '')
 
-    // Surveillance réactive du fichier (intervalle serré de 300ms pour réactivité instantanée sans surconsommation CPU)
+    // Surveillance réactive du fichier (intervalle serré de 300ms)
     fs.watchFile(filePath, { interval: 300 }, (curr, prev) => {
       if (curr.mtimeMs <= prev.mtimeMs && curr.size === prev.size) return
       this.readNewLines(filePath, curr.size)
@@ -195,7 +470,6 @@ export class AchievementTracker {
   readNewLines(filePath, newSize) {
     let offset = this.fileOffsets.get(filePath) || 0
 
-    // Si le fichier a été réinitialisé / tronqué (taille devenue inférieure à l'offset précédent)
     if (newSize < offset) {
       offset = 0
     }
@@ -215,9 +489,7 @@ export class AchievementTracker {
       const prevRemainder = this.remainders.get(filePath) || ''
       const fullText = prevRemainder + text
 
-      // Découpage par ligne
       const lines = fullText.split(/\r?\n/)
-      // La dernière ligne peut être incomplète si Steam est en train d'écrire
       const remainder = lines.pop() || ''
       this.remainders.set(filePath, remainder)
 
@@ -238,32 +510,40 @@ export class AchievementTracker {
   }
 
   /**
-   * Analyse une ligne de log avec une Regex pour détecter un déblocage de succès
-   * Formats Steam courants dans stats_log.txt :
-   *   [2026-10-11 12:00:00] [AppID 440] Achievement unlocked: 'TF_PLAY_GAME_EVERYCLASS'
-   *   [2026-10-11 12:00:00] [AppID 440] SetAchievement 'TF_PLAY_GAME_EVERYCLASS'
-   *   [2026-10-11 12:00:00] [AppID 440] unlocked achievement 'TF_PLAY_GAME_EVERYCLASS'
-   *   [2026-10-11 12:00:00] [AppID 440] Achievement TF_PLAY_GAME_EVERYCLASS unlocked
-   *   [2026-10-11 12:00:00] [AppID 440] Setting achievement TF_PLAY_GAME_EVERYCLASS
+   * Analyse une ligne de log avec gestion réactive
    * @param {string} line 
    */
   processLogLine(line) {
     if (!line.includes('[AppID')) return
 
-    const parsed = this.parseAchievementRegex(line)
-    if (!parsed) return
+    // 1. Détection immédiate du jeu actif dans le log
+    const appMatch = line.match(/\[AppID\s+(\d+)\]/i)
+    if (appMatch && appMatch[1]) {
+      const appId = appMatch[1]
+      if (!this.activeAppId || this.activeAppId !== appId) {
+        this.onGameStarted(appId)
+      }
 
-    console.log(`[AchievementTracker] 🎯 Succès détecté dans le log ! AppID: ${parsed.appId}, Code: ${parsed.achievementApiName}`)
-    this.handleUnlockedAchievement(parsed.appId, parsed.achievementApiName)
+      // 2. Déclencheur immédiat : Steam sauvegarde des stats ou succès !
+      if (line.includes('CAPIJobStoreUserStats') || line.includes('CAPIJobRequestUserStats')) {
+        this.checkPlayerAchievements(appId, false)
+      }
+    }
+
+    // 3. Fallback textuel historique (pour émulateurs ou anciens jeux qui écriraient encore en clair)
+    const parsed = this.parseAchievementRegex(line)
+    if (parsed) {
+      console.log(`[AchievementTracker] 🎯 Succès détecté via log texte ! AppID: ${parsed.appId}, Code: ${parsed.achievementApiName}`)
+      this.handleUnlockedAchievement(parsed.appId, parsed.achievementApiName)
+    }
   }
 
   /**
-   * Extraction de l'AppID et du code de succès par Regex
+   * Extraction de l'AppID et du code de succès par Regex historique
    * @param {string} line 
    * @returns {{appId: string, achievementApiName: string}|null}
    */
   parseAchievementRegex(line) {
-    // Regex universelle pour capturer l'AppID et le nom de l'achievement dans les logs Steam
     const regexList = [
       /\[AppID\s+(\d+)\]\s*(?:.*?(?:achievement\s+unlocked|unlocked\s+achievement)\s*[:']?\s*['"]?([a-zA-Z0-9_\-:]+)['"]?)/i,
       /\[AppID\s+(\d+)\]\s*(?:.*?(?:SetAchievement|Setting\s+achievement|adding\s+achievement)\s*['"]?([a-zA-Z0-9_\-:]+)['"]?)/i,
@@ -284,7 +564,7 @@ export class AchievementTracker {
   }
 
   /**
-   * Récupère les métadonnées riches depuis la Steam Web API et notifie le callback
+   * Traitement d'un succès débloqué (appel direct ou historique)
    * @param {string} appId 
    * @param {string} achievementApiName 
    */
@@ -295,27 +575,14 @@ export class AchievementTracker {
         this.onUnlockCallback(metadata)
       }
     } catch (err) {
-      console.error(`[AchievementTracker] Erreur lors de la récupération des métadonnées pour ${appId}/${achievementApiName}:`, err)
-      // Fallback avec les informations brutes
-      if (this.onUnlockCallback) {
-        this.onUnlockCallback({
-          appId,
-          gameName: `AppID ${appId}`,
-          apiName: achievementApiName,
-          displayName: achievementApiName,
-          description: 'Succès débloqué !',
-          icon: 'https://community.cloudflare.steamstatic.com/public/images/apps/' + appId + '/icon.jpg',
-          unlockedAt: new Date().toISOString()
-        })
-      }
+      console.error(`[AchievementTracker] Erreur métadonnées ${appId}/${achievementApiName}:`, err)
     }
   }
 
   /**
    * Résout le nom du jeu via le schéma ou l'API Steam Store en fallback
-   * (Nécessaire pour les jeux comme Left 4 Dead 2 ou Portal 2 où gameName est vide dans GetSchemaForGame)
    * @param {string} appId 
-   * @param {string} schemaGameName 
+   * @param {string} [schemaGameName] 
    * @returns {Promise<string>}
    */
   async resolveGameName(appId, schemaGameName) {
@@ -338,8 +605,8 @@ export class AchievementTracker {
           return cleanName
         }
       }
-    } catch (err) {
-      console.warn(`[AchievementTracker] Impossible de résoudre le nom du jeu pour AppID ${appId}:`, err)
+    } catch {
+      // Ignorer
     }
 
     const fallback = `Jeu #${appId}`
@@ -348,16 +615,18 @@ export class AchievementTracker {
   }
 
   /**
-   * Interroge l'API Steam ISteamUserStats/GetSchemaForGame avec système de cache
+   * Récupère le schéma officiel et les icônes haute résolution pour un succès
    * @param {string} appId 
    * @param {string} achievementApiName 
+   * @param {string} [providedName] 
+   * @param {string} [providedDesc] 
+   * @param {string} [providedGameName] 
    * @returns {Promise<Object>}
    */
-  async getAchievementMetadata(appId, achievementApiName) {
-    const apiKey = process.env.STEAM_API_KEY?.trim()
+  async getAchievementMetadata(appId, achievementApiName, providedName, providedDesc, providedGameName) {
+    const apiKey = this.getEffectiveApiKey()
     let schema = this.schemaCache.get(appId)
 
-    // 1. Récupération du schéma du jeu si pas en cache
     if (!schema && apiKey) {
       try {
         const url = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${appId}&l=french`
@@ -368,57 +637,49 @@ export class AchievementTracker {
             schema = data.game
             this.schemaCache.set(appId, schema)
           }
-        } else {
-          console.warn(`[AchievementTracker] Échec HTTP (${res.status}) lors de l'appel GetSchemaForGame pour AppID ${appId}`)
         }
       } catch (err) {
-        console.warn(`[AchievementTracker] Erreur réseau GetSchemaForGame:`, err)
+        console.warn(`[AchievementTracker] Erreur réseau GetSchemaForGame:`, err.message)
       }
     }
 
-    // Résolution fiable du nom du jeu (gère les noms vides de Valve comme L4D2)
-    const gameName = await this.resolveGameName(appId, schema?.gameName)
+    const gameName = providedGameName || await this.resolveGameName(appId, schema?.gameName)
     const achievementsList = schema?.availableGameStats?.achievements || []
 
-    // 2. Recherche robuste du succès correspondant dans le schéma
-    const cleanCode = achievementApiName.replace(/^['"]|['"]$/g, '').trim().toLowerCase()
+    const cleanCode = (achievementApiName || '').replace(/^['"]|['"]$/g, '').trim().toLowerCase()
     const strippedCode = cleanCode.replace(/[^a-z0-9]/g, '')
 
-    // Recherche A : correspondance directe insensible à la casse
     let target = achievementsList.find((a) => a.name.toLowerCase() === cleanCode)
-
-    // Recherche B : correspondance insensible aux underscores et tirets
     if (!target) {
       target = achievementsList.find((a) => a.name.toLowerCase().replace(/[^a-z0-9]/g, '') === strippedCode)
     }
-
-    // Recherche C : correspondance partielle
     if (!target) {
       target = achievementsList.find((a) => a.name.toLowerCase().includes(cleanCode) || cleanCode.includes(a.name.toLowerCase()))
     }
+
+    const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
     if (target) {
       return {
         appId,
         gameName,
         apiName: target.name,
-        displayName: target.displayName || target.name,
-        description: target.description || 'Succès débloqué !',
-        icon: target.icon || target.icongray || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
+        displayName: providedName || target.displayName || target.name,
+        description: providedDesc || target.description || 'Succès débloqué !',
+        icon: target.icon || target.icongray || fallbackIcon,
         iconGray: target.icongray || '',
         hidden: Boolean(target.hidden),
         unlockedAt: new Date().toISOString()
       }
     }
 
-    // 3. Fallback avec icône par défaut fiable si le code n'est pas dans le schéma
     return {
       appId,
       gameName,
       apiName: achievementApiName,
-      displayName: achievementApiName,
-      description: 'Succès débloqué !',
-      icon: 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
+      displayName: providedName || achievementApiName,
+      description: providedDesc || 'Succès débloqué !',
+      icon: fallbackIcon,
       iconGray: '',
       hidden: false,
       unlockedAt: new Date().toISOString()
@@ -427,11 +688,11 @@ export class AchievementTracker {
 
   /**
    * Déclenche une simulation manuelle (idéal pour tester l'overlay sans lancer de jeu)
-   * @param {string} appId - Par défaut 440 (Team Fortress 2)
-   * @param {string} achievementCode - Par défaut 'TF_PLAY_GAME_EVERYCLASS'
+   * @param {string} appId 
+   * @param {string} achievementCode 
    */
   async simulateUnlock(appId = '440', achievementCode = 'TF_PLAY_GAME_EVERYCLASS') {
-    console.log(`[AchievementTracker] 🧪 Simulation manuelle déclenchée pour AppID ${appId} : ${achievementCode}`)
+    console.log(`[AchievementTracker] 🧪 Simulation manuelle pour AppID ${appId} : ${achievementCode}`)
     await this.handleUnlockedAchievement(appId, achievementCode)
   }
 
@@ -442,8 +703,11 @@ export class AchievementTracker {
     return {
       isTracking: this.isTracking,
       steamPath: this.steamPath,
-      watchedFiles: this.watchedFiles,
-      hasApiKey: Boolean(process.env.STEAM_API_KEY?.trim())
+      steamId: this.getEffectiveSteamId(),
+      hasApiKey: Boolean(this.getEffectiveApiKey()),
+      activeAppId: this.activeAppId,
+      activeGameName: this.activeGameName,
+      watchedFiles: this.watchedFiles
     }
   }
 }
