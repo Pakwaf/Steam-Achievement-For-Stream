@@ -98,7 +98,7 @@
           <div class="apikey-portal-box">
             <div class="portal-info">
               <div class="portal-badge">Étape 1</div>
-              <p>Générez gratuitement votre clé sur le portail officiel de Steam (entrez n'importe quel nom de domaine comme <code>localhost</code> sur la page) :</p>
+              <p>Générez gratuitement votre clé sur le portail officiel de Steam :</p>
             </div>
             <button class="btn-open-steam-portal" @click="openSteamApiKeyPortal">
               <span>Récupérer ma clé sur steamcommunity.com</span>
@@ -600,10 +600,15 @@ onMounted(async () => {
     try {
       // 0. Récupération de la clé Steam API existante pour diriger l'utilisateur vers la bonne étape
       if (window.steamAPI.getSteamApiKey) {
-        const savedKey = await window.steamAPI.getSteamApiKey()
-        if (savedKey) {
-          steamApiKey.value = savedKey
+        const res = await window.steamAPI.getSteamApiKey()
+        const rawKey = typeof res === 'string' ? res : (res?.apiKey || '')
+        const trimmedKey = (rawKey || '').trim()
+        if (trimmedKey && trimmedKey.length >= 8) {
+          steamApiKey.value = trimmedKey
           authStep.value = 'login'
+        } else {
+          steamApiKey.value = ''
+          authStep.value = 'apikey'
         }
       }
 
@@ -865,8 +870,9 @@ async function handleSaveApiKey() {
   if (isSavingKey.value) return
   isSavingKey.value = true
   try {
+    const keyToSave = typeof steamApiKey.value === 'string' ? steamApiKey.value.trim() : ''
     if (window.steamAPI?.saveSteamApiKey) {
-      await window.steamAPI.saveSteamApiKey(steamApiKey.value.trim())
+      await window.steamAPI.saveSteamApiKey(keyToSave)
     }
     keySavedMessage.value = 'Clé API enregistrée avec succès ! Redirection...'
     setTimeout(() => {

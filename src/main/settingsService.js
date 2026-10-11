@@ -61,7 +61,12 @@ export class SettingsService {
   }
 
   getSteamApiKey() {
-    const key = (this.settings.steamApiKey || process.env.STEAM_API_KEY || '').trim()
+    let key = (this.settings.steamApiKey || process.env.STEAM_API_KEY || '').trim()
+    if (key === '[object Object]' || key === 'undefined' || key === 'null') {
+      key = ''
+      this.settings.steamApiKey = ''
+      this.persist()
+    }
     return {
       apiKey: key,
       hasKey: Boolean(key && key.length >= 8)
@@ -69,7 +74,10 @@ export class SettingsService {
   }
 
   saveSteamApiKey(key) {
-    const trimmed = (key || '').trim()
+    let trimmed = (typeof key === 'string' ? key : '').trim()
+    if (trimmed === '[object Object]' || trimmed === 'undefined' || trimmed === 'null') {
+      trimmed = ''
+    }
     this.settings.steamApiKey = trimmed
     process.env.STEAM_API_KEY = trimmed
     this.persist()
