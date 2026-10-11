@@ -338,23 +338,33 @@ export class AchievementTracker {
    */
   async onGameStarted(appId, gameName) {
     if (!appId) return
-    if (this.activeAppId === appId && this.gameInitialized.get(appId)) return
 
+    // Si c'est déjà le même jeu actif et que son suivi tourne, ne rien perturber
+    if (this.activeAppId === appId && this.gameInitialized.get(appId) && this.gamePollTimer) {
+      return
+    }
+
+    const previousAppId = this.activeAppId
     this.activeAppId = appId
     this.activeGameName = gameName || await this.resolveGameName(appId)
 
-    console.log(`[AchievementTracker] 🎮 Jeu détecté en cours d'exécution : ${this.activeGameName} (AppID ${appId})`)
+    if (previousAppId !== appId) {
+      console.log(`[AchievementTracker] 🎮 Jeu détecté en cours d'exécution : ${this.activeGameName} (AppID ${appId})`)
+    }
 
-    // 1. Initialiser le jeu : indexer l'état actuel des succès
-    await this.checkPlayerAchievements(appId, true)
+    // Si ce jeu n'a jamais été initialisé dans la session, on indexe son point de départ
+    const isAlreadyInitialized = this.gameInitialized.get(appId)
+    if (!isAlreadyInitialized) {
+      await this.checkPlayerAchievements(appId, true)
+    }
 
-    // 2. Démarrer la surveillance rapprochée pendant la partie (toutes les 1.8 secondes)
+    // Démarrer la surveillance rapprochée pendant la partie (toutes les 1.5 secondes)
     if (this.gamePollTimer) clearInterval(this.gamePollTimer)
     this.gamePollTimer = setInterval(async () => {
       if (this.activeAppId === appId) {
         await this.checkPlayerAchievements(appId, false)
       }
-    }, 1800)
+    }, 1500)
   }
 
   /**
@@ -386,9 +396,18 @@ export class AchievementTracker {
     this.isCheckingAchievements = true
 
     try {
-      const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${apiKey}&steamid=${steamId}&l=french`
-      const res = await fetch(url)
-      if (!res.ok) return
+      // Ajout d'un timestamp anti-cache pour forcer Steam à renvoyer l'état le plus frais
+      const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${apiKey}&steamid=${steamId}&l=french&_t=${Date.now()}`
+      const res = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
+      if (!res.ok) {
+        console.warn(`[AchievementTracker] ⚠️ Requête GetPlayerAchievements status HTTP ${res.status} pour AppID ${appId}`)
+        return
+      }
 
       const data = await res.json()
       const achievements = data?.playerstats?.achievements || []
@@ -407,7 +426,7 @@ export class AchievementTracker {
       if (isInitial || !this.gameInitialized.get(appId)) {
         for (const a of achievements) {
           if (a.achieved === 1) {
-            knownSet.add(a.apiname)
+            knownSet.add((a.apiname || '').toLowerCase().trim())
           }
         }
         this.gameInitialized.set(appId, true)
@@ -417,9 +436,10 @@ export class AchievementTracker {
 
       // Recherche des nouveaux succès débloqués depuis la dernière vérification
       for (const a of achievements) {
-        if (a.achieved === 1 && !knownSet.has(a.apiname)) {
+        const codeKey = (a.apiname || '').toLowerCase().trim()
+        if (a.achieved === 1 && !knownSet.has(codeKey)) {
           // NOUVEAU SUCCÈS DÉBLOQUÉ !
-          knownSet.add(a.apiname)
+          knownSet.add(codeKey)
           console.log(`[AchievementTracker] 🏆 NOUVEAU SUCCÈS DÉBLOQUÉ : "${a.name || a.apiname}" dans ${resolvedGameName} !`)
 
           const meta = await this.getAchievementMetadata(appId, a.apiname, a.name, a.description, resolvedGameName)
@@ -516,17 +536,21 @@ export class AchievementTracker {
   processLogLine(line) {
     if (!line.includes('[AppID')) return
 
-    // 1. Détection immédiate du jeu actif dans le log
     const appMatch = line.match(/\[AppID\s+(\d+)\]/i)
     if (appMatch && appMatch[1]) {
       const appId = appMatch[1]
-      if (!this.activeAppId || this.activeAppId !== appId) {
+
+      // Si aucun jeu actif n'a été détecté via l'API, on utilise celui du log
+      if (!this.activeAppId) {
         this.onGameStarted(appId)
       }
 
-      // 2. Déclencheur immédiat : Steam sauvegarde des stats ou succès !
+      // Déclencheur immédiat : Steam sauvegarde des stats ou succès !
+      // On déclenche la vérification si la ligne concerne le jeu actif ou si le log est en cours
       if (line.includes('CAPIJobStoreUserStats') || line.includes('CAPIJobRequestUserStats')) {
-        this.checkPlayerAchievements(appId, false)
+        const targetAppId = this.activeAppId || appId
+        console.log(`[AchievementTracker] ⚡ Déclencheur Steam reçu dans stats_log.txt pour AppID ${targetAppId}`)
+        this.checkPlayerAchievements(targetAppId, false)
       }
     }
 
