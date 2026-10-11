@@ -537,7 +537,6 @@ export class CustomizationService {
 
       // 1. Détection de l'ancienne structure Phase 4 (un seul thème à la racine)
       if (parsed && !Array.isArray(parsed.themes) && (parsed.html || parsed.css)) {
-        console.log('[CustomizationService] 🔄 Migration de l\'ancien format Phase 4 vers la Bibliothèque de thèmes...')
         const migratedTheme = {
           id: 'theme-custom-perso',
           name: 'Mon Thème Personnalisé',
@@ -578,8 +577,6 @@ export class CustomizationService {
         } else {
           this.activeThemeId = this.themes[0].id
         }
-
-        console.log(`[CustomizationService] 📚 Bibliothèque chargée : ${this.themes.length} thème(s), Actif : "${this.getActiveTheme()?.name}"`)
       } else {
         // Bibliothèque vide : initialiser avec les thèmes par défaut
         this.themes = BUILTIN_THEMES.map((t) => ({
@@ -609,7 +606,6 @@ export class CustomizationService {
         themes: this.themes
       }
       fs.writeFileSync(this.configPath, JSON.stringify(dataToSave, null, 2), 'utf-8')
-      console.log('[CustomizationService] 💾 Bibliothèque de thèmes sauvegardée sur le disque')
     } catch (err) {
       console.error('[CustomizationService] Erreur écriture config:', err)
     }
@@ -640,7 +636,6 @@ export class CustomizationService {
 
     this.activeThemeId = id
     this.persist()
-    console.log(`[CustomizationService] ⚡ Thème actif changé : "${target.name}" (${target.id})`)
 
     this.notifyUpdate()
     this.notifyLibraryUpdate()

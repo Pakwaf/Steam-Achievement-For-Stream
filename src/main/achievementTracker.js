@@ -79,7 +79,6 @@ export class AchievementTracker {
   setSteamUser(user) {
     if (user?.steamId) {
       this.steamId = user.steamId
-      console.log(`[AchievementTracker] 👤 Utilisateur Steam associé : ${user.personaName || user.steamId} (${user.steamId})`)
     } else {
       this.steamId = null
     }
@@ -92,7 +91,6 @@ export class AchievementTracker {
   setApiKey(key) {
     if (key && typeof key === 'string') {
       this.apiKey = key.trim()
-      console.log(`[AchievementTracker] 🔑 Clé Steam API actualisée : ${this.apiKey.substring(0, 4)}...`)
     }
   }
 
@@ -243,13 +241,8 @@ export class AchievementTracker {
     this.steamId = this.getEffectiveSteamId()
     this.apiKey = this.getEffectiveApiKey()
 
-    console.log(`[AchievementTracker] 🔍 Steam détecté dans : ${this.steamPath}`)
-    console.log(`[AchievementTracker] 👤 SteamID64 actif : ${this.steamId || 'Non détecté'}`)
-    console.log(`[AchievementTracker] 🔑 Clé API Steam présente : ${Boolean(this.apiKey)}`)
-
     // 1. Surveillance temps réel du fichier de log stats_log.txt
     this.watchedFiles = this.findLogFiles(this.steamPath)
-    console.log(`[AchievementTracker] 📄 Fichiers de log surveillés :`, this.watchedFiles)
 
     for (const filePath of this.watchedFiles) {
       this.attachFileWatcher(filePath)
@@ -285,7 +278,6 @@ export class AchievementTracker {
 
     this.isTracking = false
     this.onUnlockCallback = null
-    console.log('[AchievementTracker] Surveillance arrêtée.')
   }
 
   /**
@@ -548,7 +540,6 @@ export class AchievementTracker {
       // On déclenche la vérification si la ligne concerne le jeu actif ou si le log est en cours
       if (line.includes('CAPIJobStoreUserStats') || line.includes('CAPIJobRequestUserStats')) {
         const targetAppId = this.activeAppId || appId
-        console.log(`[AchievementTracker] ⚡ Déclencheur Steam reçu dans stats_log.txt pour AppID ${targetAppId}`)
         this.checkPlayerAchievements(targetAppId, false)
       }
     }
@@ -556,7 +547,6 @@ export class AchievementTracker {
     // 3. Fallback textuel historique (pour émulateurs ou anciens jeux qui écriraient encore en clair)
     const parsed = this.parseAchievementRegex(line)
     if (parsed) {
-      console.log(`[AchievementTracker] 🎯 Succès détecté via log texte ! AppID: ${parsed.appId}, Code: ${parsed.achievementApiName}`)
       this.handleUnlockedAchievement(parsed.appId, parsed.achievementApiName)
     }
   }
@@ -715,7 +705,6 @@ export class AchievementTracker {
    * @param {string} achievementCode 
    */
   async simulateUnlock(appId = '440', achievementCode = 'TF_PLAY_GAME_EVERYCLASS') {
-    console.log(`[AchievementTracker] 🧪 Simulation manuelle pour AppID ${appId} : ${achievementCode}`)
     await this.handleUnlockedAchievement(appId, achievementCode)
   }
 

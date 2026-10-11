@@ -42,7 +42,6 @@
         </div>
         <div class="brand-text">
           <h1>Steam Custom Achievements</h1>
-          <span class="badge-phase">Phase 5 • Bibliothèque de Thèmes</span>
         </div>
       </div>
       <div class="header-status-group">
@@ -50,7 +49,7 @@
         <div class="tracker-status-chip" :class="{ active: trackerStatus?.isTracking }">
           <span class="chip-dot"></span>
           <span v-if="trackerStatus?.activeGameName">En jeu : {{ trackerStatus.activeGameName }}</span>
-          <span v-else>{{ trackerStatus?.isTracking ? 'Tracker Actif (En attente de jeu)' : 'Tracker Inactif' }}</span>
+          <span v-else>{{ trackerStatus?.isTracking ? 'En attente de jeu' : 'Inactif' }}</span>
         </div>
         <!-- Auth status -->
         <div class="system-status">
@@ -73,15 +72,14 @@
         </div>
       </div>
 
-      <!-- État 1 : Utilisateur non connecté -->
       <!-- État 1 : Utilisateur non connecté (Configuration Clé API puis Connexion) -->
       <section v-if="!currentUser" class="auth-section">
         <!-- ÉTAPE 1 : Configuration initiale de la Clé Steam Web API -->
         <div v-if="authStep === 'apikey'" class="auth-card apikey-setup-card">
           <div class="auth-steps-header">
-            <span class="step-chip active">1. Clé API Steam Web</span>
+            <span class="step-chip active">1. Clé API</span>
             <span class="step-separator">➔</span>
-            <span class="step-chip">2. Connexion Steam</span>
+            <span class="step-chip">2. Connexion</span>
           </div>
 
           <div class="auth-icon-wrapper apikey-glow">
@@ -90,19 +88,18 @@
             </svg>
           </div>
 
-          <h2>Configuration de la clé Steam API</h2>
+          <h2>Clé Steam Web API</h2>
           <p class="auth-description">
-            Pour récupérer automatiquement les noms, descriptions détaillées et icônes officielles de tous vos succès Steam, veuillez configurer votre clé Steam Web API.
+            Nécessaire pour récupérer les visuels et informations officielles de vos succès.
           </p>
 
-          <!-- Bloc d'explication et bouton direct vers le site de Steam -->
+          <!-- Bloc portail Steam -->
           <div class="apikey-portal-box">
             <div class="portal-info">
-              <div class="portal-badge">Étape 1</div>
-              <p>Générez gratuitement votre clé sur le portail officiel de Steam (Steam vous demandera un nom de domaine : soyez créatif dans votre nom, mais mettez quelque chose que vous assimilerez facilement, par exemple <code>mon-overlay-stream</code> ou votre pseudo) :</p>
+              <p>Générez gratuitement votre clé sur le portail officiel de Steam. <em>(Indiquez le nom de domaine de votre choix, ex : <code>overlay-stream</code>)</em></p>
             </div>
             <button class="btn-open-steam-portal" @click="openSteamApiKeyPortal">
-              <span>Récupérer ma clé sur steamcommunity.com</span>
+              <span>Obtenir ma clé</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="external-link-icon">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
               </svg>
@@ -112,7 +109,7 @@
           <!-- Champ pour coller la clé -->
           <div class="apikey-input-section">
             <label class="apikey-label">
-              <span>Étape 2 : Collez votre clé API Steam (32 caractères)</span>
+              <span>Collez votre clé API (32 caractères)</span>
             </label>
             <div class="key-input-wrapper">
               <input
@@ -139,11 +136,11 @@
               :disabled="isSavingKey"
               @click="handleSaveApiKey"
             >
-              <span>{{ isSavingKey ? 'Enregistrement...' : 'Enregistrer et passer à la connexion ➔' }}</span>
+              <span>{{ isSavingKey ? 'Enregistrement...' : 'Continuer' }}</span>
             </button>
 
             <button class="btn-skip-key-step" @click="skipApiKeySetup">
-              Continuer sans clé API (Mode fallback)
+              Passer cette étape
             </button>
           </div>
         </div>
@@ -151,10 +148,10 @@
         <!-- ÉTAPE 2 : Connexion Steam OpenID -->
         <div v-else class="auth-card">
           <div class="auth-steps-header">
-            <button class="btn-back-step" title="Revenir pour modifier la clé API" @click="goToApiKeyStep">
-              ← Modifier la clé API Steam
+            <button class="btn-back-step" title="Modifier la clé API Steam" @click="goToApiKeyStep">
+              ← Clé API
             </button>
-            <span class="step-chip active">2. Connexion Steam</span>
+            <span class="step-chip active">2. Connexion</span>
           </div>
 
           <div class="auth-icon-wrapper">
@@ -163,9 +160,9 @@
             </svg>
           </div>
 
-          <h2>Connexion Steam requise</h2>
+          <h2>Connexion Steam</h2>
           <p class="auth-description">
-            Connectez-vous avec votre compte Steam pour associer votre profil et commencer à suivre vos succès en temps réel.
+            Connectez votre compte pour synchroniser vos succès en temps réel.
           </p>
 
           <div v-if="errorMessage" class="error-banner">
@@ -188,19 +185,16 @@
               <svg v-else viewBox="0 0 24 24" fill="currentColor" class="btn-steam-icon">
                 <path d="M12 2C6.48 2 2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15c-.55-.26-1-.8-1-1.5 0-.83.67-1.5 1.5-1.5.15 0 .29.02.43.07L13.5 9.5C13.2 9.07 13 8.56 13 8c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3c-.56 0-1.07-.2-1.5-.5l-2.57 2.57c.05.14.07.28.07.43 0 .7-.45 1.24-1 1.5v6.8c4.56-.93 8-4.96 8-9.8 0-5.52-4.48-10-10-10z"/>
               </svg>
-              <span>{{ isLoading ? 'Connexion en cours...' : 'Se connecter avec Steam' }}</span>
+              <span>{{ isLoading ? 'Connexion en cours...' : 'Se connecter' }}</span>
             </button>
           </div>
 
-          <div class="security-notice">
+          <div class="security-notice" title="Connexion officielle Steam OpenID 2.0. Aucun mot de passe requis.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="lock-icon">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
-            <p>
-              Authentification sécurisée officielle via <strong>Steam OpenID 2.0</strong>.<br/>
-              Votre mot de passe n'est jamais requis.
-            </p>
+            <p>Authentification sécurisée via <strong>Steam OpenID</strong>.</p>
           </div>
         </div>
       </section>
@@ -245,7 +239,7 @@
           </div>
         </div>
 
-        <!-- 2. NOUVEAU EN PHASE 3 : Panneau de Double Affichage (Overlay Desktop & OBS) -->
+        <!-- 2. Panneau de Double Affichage (Overlay Desktop & OBS) -->
         <div class="display-systems-card">
           <div class="display-systems-header">
             <div class="icon-title-group">
@@ -257,11 +251,10 @@
                 </svg>
               </div>
               <div>
-                <h3>Double Système d'Affichage</h3>
-                <p class="subtitle">Overlay transparent pour le joueur + Serveur WebSocket local pour OBS</p>
+                <h3>Systèmes d'Affichage</h3>
+                <p class="subtitle">Overlay transparent pour le joueur et source navigateur pour OBS</p>
               </div>
             </div>
-            <span class="badge-phase-tag">Phase 3 Active</span>
           </div>
 
           <div class="display-grid">
@@ -270,18 +263,13 @@
               <div class="display-item-header">
                 <div class="display-item-title">
                   <span class="item-badge-pill in-game">En Jeu</span>
-                  <h4>Overlay Desktop Transparent</h4>
+                  <h4>Overlay Écran</h4>
                 </div>
-                <span class="status-indicator-pill active">Actif (Plein écran)</span>
+                <span class="status-indicator-pill active">Actif</span>
               </div>
               <p class="item-desc">
-                Fenêtre Electron transparente de premier plan. Les clics souris passent à travers (<code>setIgnoreMouseEvents</code>) pour ne pas gêner le gameplay.
+                Affichage transparent direct sur votre écran de jeu, sans bloquer vos clics ni votre gameplay.
               </p>
-              <div class="item-properties-list">
-                <span class="prop-chip">✔ Fond 100% transparent</span>
-                <span class="prop-chip">✔ Clics traversants</span>
-                <span class="prop-chip">✔ Always on top</span>
-              </div>
             </div>
 
             <!-- Colonne 2 : Serveur Local OBS Studio -->
@@ -289,40 +277,39 @@
               <div class="display-item-header">
                 <div class="display-item-title">
                   <span class="item-badge-pill obs">OBS Studio</span>
-                  <h4>Source Navigateur OBS</h4>
+                  <h4>Source OBS</h4>
                 </div>
                 <span class="status-indicator-pill" :class="{ active: obsStatus?.isRunning }">
-                  {{ obsStatus?.isRunning ? 'Port 8080 en écoute' : 'Démarrage...' }}
+                  {{ obsStatus?.isRunning ? 'Port 8080' : 'Démarrage...' }}
                 </span>
               </div>
               <p class="item-desc">
-                Ajoutez une <strong>Source Navigateur</strong> dans OBS pointant vers cette URL pour afficher les succès en direct sur votre stream :
+                Source Navigateur à intégrer dans OBS Studio pour diffuser les succès sur votre stream :
               </p>
               <div class="obs-url-container">
                 <code class="obs-url-text">{{ obsUrl }}</code>
                 <div class="obs-url-actions">
                   <button class="btn-copy-obs" @click="copyObsUrl">
-                    {{ obsCopied ? 'URL Copiée !' : 'Copier l\'URL' }}
+                    {{ obsCopied ? 'Copié !' : 'Copier' }}
                   </button>
                   <button class="btn-test-obs" @click="openObsInBrowser" title="Tester dans le navigateur">
                     Ouvrir ↗
                   </button>
                 </div>
               </div>
-              <div class="obs-alt-url">
-                <span class="alt-label">Nom d'hôte alternatif :</span>
+              <div class="obs-alt-url" title="Alternative locale si nécessaire">
+                <span class="alt-label">Alternative :</span>
                 <code class="alt-code" @click="copyObsUrlLocalhost" title="Cliquer pour copier">http://localhost:8080/obs</code>
                 <span v-if="obsLocalhostCopied" class="copied-badge">Copié !</span>
               </div>
               <div class="obs-meta-stats">
-                <span>Sources OBS connectées : <strong :class="{ 'connected-count': (obsStatus?.connectedClients || 0) > 0 }">{{ obsStatus?.connectedClients || 0 }}</strong></span>
-                <span>Protocole : <strong>WebSocket (:8080)</strong></span>
+                <span>Sources connectées : <strong :class="{ 'connected-count': (obsStatus?.connectedClients || 0) > 0 }">{{ obsStatus?.connectedClients || 0 }}</strong></span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 3. NOUVEAU EN PHASE 5 : Bibliothèque de Thèmes & Éditeur Modulaire -->
+        <!-- 3. Bibliothèque de Thèmes & Éditeur Modulaire -->
         <div v-if="currentView === 'editor'" class="editor-view-wrapper">
           <CustomizationEditor
             :target-theme="editingTheme"
@@ -344,17 +331,17 @@
               <div>
                 <div class="title-with-pill">
                   <h3>Bibliothèque de Thèmes</h3>
-                  <span class="theme-count-pill">{{ themeLibrary.themes.length }} Thème{{ themeLibrary.themes.length > 1 ? 's' : '' }}</span>
+                  <span class="theme-count-pill">{{ themeLibrary.themes.length }}</span>
                 </div>
-                <p class="subtitle">Sélectionnez le thème actif pour vos streams du jour ou personnalisez vos designs</p>
+                <p class="subtitle">Sélectionnez le thème actif pour vos streams ou personnalisez vos designs</p>
               </div>
             </div>
 
             <div class="library-header-actions">
               <span v-if="libraryStatusMessage" class="lib-status-toast">{{ libraryStatusMessage }}</span>
-              <button class="btn-create-theme" title="Créer un nouveau thème basé sur le template de départ" @click="handleCreateNewTheme">
+              <button class="btn-create-theme" title="Créer un nouveau thème" @click="handleCreateNewTheme">
                 <span class="plus-icon">+</span>
-                <span>Créer un nouveau thème</span>
+                <span>Nouveau thème</span>
               </button>
             </div>
           </div>
@@ -371,15 +358,13 @@
               <div class="card-status-bar">
                 <div v-if="thm.id === themeLibrary.activeThemeId" class="active-badge">
                   <span class="active-sparkle">★</span>
-                  <span>THÈME ACTIF EN DIRECT</span>
+                  <span>Actif</span>
                 </div>
-                <div v-else class="inactive-badge">
-                  <span>DISPONIBLE</span>
-                </div>
+                <div v-else></div>
 
-                <div class="card-audio-indicator" :title="thm.audioPath || 'Carillon par défaut'">
-                  <span v-if="thm.audioPath" class="audio-chip custom">🎵 Son Perso</span>
-                  <span v-else class="audio-chip default">🔔 Son Standard</span>
+                <div class="card-audio-indicator" :title="thm.audioPath || 'Son standard par défaut'">
+                  <span v-if="thm.audioPath" class="audio-chip custom">🎵 Son perso</span>
+                  <span v-else class="audio-chip default">🔔 Standard</span>
                 </div>
               </div>
 
@@ -399,20 +384,20 @@
                   class="btn-card-action btn-activate"
                   :class="{ 'already-active': thm.id === themeLibrary.activeThemeId }"
                   :disabled="thm.id === themeLibrary.activeThemeId"
-                  title="Définir ce thème pour les overlays Desktop et OBS"
+                  title="Activer ce thème pour les overlays"
                   @click="handleActivateTheme(thm.id)"
                 >
                   <span v-if="thm.id === themeLibrary.activeThemeId">✓ Actif</span>
-                  <span v-else>⚡ Activer</span>
+                  <span v-else>Activer</span>
                 </button>
 
                 <!-- Bouton Éditer -->
                 <button
                   class="btn-card-action btn-edit"
-                  title="Modifier le code HTML, le CSS et le son de ce thème"
+                  title="Modifier le code et le style de ce thème"
                   @click="handleEditTheme(thm)"
                 >
-                  ✏ Éditer
+                  Éditer
                 </button>
 
                 <!-- Bouton Dupliquer -->
@@ -421,17 +406,17 @@
                   title="Créer une copie exacte de ce thème"
                   @click="handleDuplicateTheme(thm.id)"
                 >
-                  ⎘ Dupliquer
+                  Dupliquer
                 </button>
 
                 <!-- Bouton Supprimer -->
                 <button
                   class="btn-card-action btn-delete"
                   :disabled="themeLibrary.themes.length <= 1"
-                  :title="themeLibrary.themes.length <= 1 ? 'Impossible de supprimer le seul thème restant' : 'Supprimer ce thème'"
+                  :title="themeLibrary.themes.length <= 1 ? 'Impossible de supprimer le seul thème restant' : 'Supprimer'"
                   @click="handleDeleteTheme(thm)"
                 >
-                  🗑
+                  Supprimer
                 </button>
               </div>
             </div>
@@ -447,25 +432,25 @@
                 <span class="pulse-center"></span>
               </div>
               <div>
-                <h3>Détection des succès en temps réel</h3>
-                <p class="tracker-subtitle">Surveillance active des fichiers de logs Steam (0ms de latence)</p>
+                <h3>Détection des succès</h3>
+                <p class="tracker-subtitle">Surveillance continue des succès Steam</p>
               </div>
             </div>
             <span class="badge-active-tracker">
-              {{ trackerStatus?.isTracking ? '● Écoute en cours' : '○ Déconnecté' }}
+              {{ trackerStatus?.isTracking ? '● Prêt' : '○ Inactif' }}
             </span>
           </div>
 
           <!-- Informations système détectées -->
           <div class="tracker-diagnostics">
             <div class="diag-item">
-              <span class="diag-label">Répertoire Steam :</span>
+              <span class="diag-label">Dossier Steam :</span>
               <span class="diag-value" :title="trackerStatus?.steamPath">
-                {{ trackerStatus?.steamPath || 'Recherche automatique en cours...' }}
+                {{ trackerStatus?.steamPath || 'Recherche automatique...' }}
               </span>
             </div>
             <div class="diag-item">
-              <span class="diag-label">Log surveillé :</span>
+              <span class="diag-label">Fichier surveillé :</span>
               <span class="diag-value" :title="trackerStatus?.watchedFiles?.join(', ')">
                 {{ trackerStatus?.watchedFiles?.[0] ? getFilename(trackerStatus.watchedFiles[0]) : 'stats_log.txt' }}
               </span>
@@ -473,7 +458,7 @@
             <div class="diag-item">
               <span class="diag-label">Clé Steam Web API :</span>
               <span class="diag-value" :class="{ 'api-ok': trackerStatus?.hasApiKey, 'api-warn': !trackerStatus?.hasApiKey }">
-                {{ trackerStatus?.hasApiKey ? 'Configurée (.env) ✔' : 'Non renseignée (Mode fallback public)' }}
+                {{ trackerStatus?.hasApiKey ? 'Configurée ✔' : 'Non configurée (fallback)' }}
               </span>
             </div>
           </div>
@@ -481,8 +466,8 @@
           <!-- Section de Test & Simulation -->
           <div class="simulation-section">
             <div class="simulation-header">
-              <h4>Tester les Overlays (Simulation simultanée Desktop & OBS)</h4>
-              <p>Simulez le déblocage d'un succès pour valider le déclenchement sur l'overlay desktop et OBS en même temps :</p>
+              <h4>Tester les Overlays</h4>
+              <p>Simulez le déblocage d'un succès pour valider l'affichage sur votre écran et sur OBS :</p>
             </div>
 
             <div class="sim-buttons-row">
@@ -516,12 +501,12 @@
           </div>
         </div>
 
-        <!-- 4. Historique des succès reçus durant la session -->
+        <!-- 5. Historique des succès de la session -->
         <div class="history-card">
           <div class="history-header">
-            <h3>Succès détectés cette session ({{ unlockedHistory.length }})</h3>
+            <h3>Succès récents ({{ unlockedHistory.length }})</h3>
             <span v-if="unlockedHistory.length > 0" class="btn-clear-history" @click="unlockedHistory = []">
-              Effacer la liste
+              Effacer
             </span>
           </div>
 
@@ -530,7 +515,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.504-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.072 0a5.25 5.25 0 00-6.072 0m6.072 0c.937.606 1.572 1.637 1.603 2.825m-7.675-2.825c-.937.606-1.572 1.637-1.603 2.825M12 3v9m0 0l-3-3m3 3l3-3" />
             </svg>
             <p>En attente du premier succès...</p>
-            <span class="empty-sub">Lancez un jeu Steam ou cliquez sur l'un des boutons de simulation ci-dessus.</span>
+            <span class="empty-sub">Lancez un jeu Steam ou utilisez les boutons de test ci-dessus.</span>
           </div>
 
           <div v-else class="history-list">

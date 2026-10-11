@@ -35,12 +35,6 @@ export class ObsServer {
     this.server = http.createServer(this.app)
     this.wss = new WebSocketServer({ server: this.server })
 
-    // 1. Journalisation des requêtes HTTP pour diagnostic immédiat
-    this.app.use((req, _res, next) => {
-      console.log(`[ObsServer HTTP] 🌐 ${req.method} ${req.url} (depuis ${req.socket.remoteAddress || 'inconnu'})`)
-      next()
-    })
-
     // 2. Middleware CORS pour autoriser l'accès depuis OBS et navigateurs
     this.app.use((_req, res, next) => {
       res.setHeader('Access-Control-Allow-Origin', '*')
@@ -54,8 +48,6 @@ export class ObsServer {
     // 3. Gestion des connexions WebSocket (clients OBS Browser Source)
     this.wss.on('connection', (ws, req) => {
       this.clients.add(ws)
-      const clientIp = req.socket.remoteAddress || 'inconnu'
-      console.log(`[ObsServer WS] 🟢 SOURCE OBS CONNECTÉE depuis ${clientIp} ! (Total connectés: ${this.clients.size})`)
       this.notifyStatus()
 
       // Message de confirmation envoyé au client
@@ -86,8 +78,6 @@ export class ObsServer {
           const parsed = JSON.parse(message.toString())
           if (parsed.type === 'PING') {
             ws.send(JSON.stringify({ type: 'PONG' }))
-          } else if (parsed.type === 'OBS_CLIENT_READY') {
-            console.log(`[ObsServer WS] 📺 Source OBS prête à recevoir les succès`)
           }
         } catch {
           // message non-JSON ignoré
@@ -96,7 +86,6 @@ export class ObsServer {
 
       ws.on('close', () => {
         this.clients.delete(ws)
-        console.log(`[ObsServer WS] 🔴 Source OBS déconnectée (Restant: ${this.clients.size})`)
         this.notifyStatus()
       })
 
@@ -206,14 +195,11 @@ export class ObsServer {
       }
     })
 
-    let sentCount = 0
     for (const client of this.clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(payload)
-        sentCount++
       }
     }
-    console.log(`[ObsServer] 🎨 Thème personnalisé diffusé à ${sentCount} source(s) OBS`)
   }
 
   /**
@@ -240,14 +226,11 @@ export class ObsServer {
       data: achievementData
     })
 
-    let sentCount = 0
     for (const client of this.clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(payload)
-        sentCount++
       }
     }
-    console.log(`[ObsServer] 📢 Succès diffusé à ${sentCount} source(s) OBS connectée(s) :`, achievementData.displayName)
   }
 
   /**
@@ -265,7 +248,6 @@ export class ObsServer {
       this.server.close()
     }
     this.isRunning = false
-    console.log('[ObsServer] Serveur OBS arrêté.')
     this.notifyStatus()
   }
 
@@ -433,12 +415,10 @@ ${theme.css || DEFAULT_THEME.css}
       try {
         const sep = url.indexOf('?') !== -1 ? '&' : '?';
         const fetchUrl = url + sep + '_obs=' + Date.now();
-        console.log('[OBS Sound] 📥 Chargement du fichier audio en cours :', fetchUrl);
         const res = await fetch(fetchUrl);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const arrayBuf = await res.arrayBuffer();
         customAudioBuffer = await ctx.decodeAudioData(arrayBuf);
-        console.log('[OBS Sound] ✔ Nouveau fichier audio personnalisé décodé et prêt en mémoire !');
       } catch (err) {
         console.warn("[OBS Sound] Impossible de charger l'audio personnalise, repli prevu:", err.message);
         customAudioBuffer = null;
@@ -485,7 +465,6 @@ ${theme.css || DEFAULT_THEME.css}
             source.connect(gain);
             gain.connect(ctx.destination);
             source.start(0);
-            console.log('[OBS Sound] 🔊 Son personnalisé joué avec succès via Web Audio !');
             return;
           }
         } catch (e) {
@@ -510,7 +489,6 @@ ${theme.css || DEFAULT_THEME.css}
                 source.connect(gain);
                 gain.connect(ctx.destination);
                 source.start(0);
-                console.log('[OBS Sound] 🔊 Son personnalisé joué à la volée !');
               })
               .catch(function() {
                 playDefaultChime();
@@ -568,13 +546,11 @@ ${theme.css || DEFAULT_THEME.css}
       }
 
       const wsUrl = 'ws://' + host + ':' + port;
-      console.log('[OBS Overlay] Connexion WebSocket vers', wsUrl);
 
       try {
         ws = new WebSocket(wsUrl);
 
         ws.onopen = function() {
-          console.log('[OBS Overlay] ✔ Connecté au serveur OBS via', wsUrl);
           reconnectAttempts = 0;
           statusPill.classList.add('connected');
           statusText.textContent = 'OBS Source Connectée (Port ' + port + ')';
@@ -591,7 +567,6 @@ ${theme.css || DEFAULT_THEME.css}
             const payload = JSON.parse(event.data);
 
             if (payload.type === 'CUSTOMIZATION_UPDATED' && payload.data) {
-              console.log('[OBS Overlay] 🎨 Mise à jour du thème reçue :', payload.data);
               if (payload.data.html && payload.data.html.trim()) {
                 currentHtmlTemplate = payload.data.html;
               }
@@ -613,7 +588,6 @@ ${theme.css || DEFAULT_THEME.css}
                 customAudioBuffer = null;
               }
             } else if (payload.type === 'ACHIEVEMENT_UNLOCKED' && payload.data) {
-              console.log('[OBS Overlay] 🏆 Succès reçu :', payload.data.displayName);
               displayAchievement(payload.data);
             }
           } catch (e) {
@@ -643,7 +617,6 @@ ${theme.css || DEFAULT_THEME.css}
     // Affiche le succès pendant 5 secondes avec injection du HTML/CSS personnalisé
     function displayAchievement(data) {
       if (!data) return;
-      console.log('[OBS Overlay] 🏆 Affichage du succès :', data.displayName);
       if (toastTimeout) {
         clearTimeout(toastTimeout);
       }

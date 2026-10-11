@@ -187,7 +187,6 @@ export async function playAchievementSound(themeData = {}) {
               gainNode.connect(ctx.destination)
               source.start(0)
 
-              console.log('[SoundPlayer] 🔊 Son personnalisé joué avec succès via Web Audio API')
               return true
             }
           }
@@ -209,7 +208,6 @@ export async function playAchievementSound(themeData = {}) {
             audioEl.volume = Math.min(1, Math.max(0, volume))
             audioEl.src = audioInfo.dataUrl
             await audioEl.play()
-            console.log('[SoundPlayer] 🔊 Son personnalisé joué avec succès via HTML5 Audio')
             return true
           }
         } catch (html5Err) {
@@ -222,6 +220,5 @@ export async function playAchievementSound(themeData = {}) {
   }
 
   // --- ÉTAPE 3 : Fallback Carillon synthétisé par défaut ---
-  console.log('[SoundPlayer] 🔔 Lecture du carillon par défaut')
   return await playSynthesizedChime(volume, deviceId)
 }

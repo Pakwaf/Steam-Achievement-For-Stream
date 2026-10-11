@@ -56,7 +56,6 @@ function createMainWindow() {
   const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:3000'
 
   if (isDev) {
-    console.log('[Electron] Chargement Dashboard (Dev):', `${rendererUrl}/#/`)
     mainWindow.loadURL(`${rendererUrl}/#/`)
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'), { hash: '/' })
@@ -107,10 +106,6 @@ function createOverlayWindow() {
   overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
-  overlayWindow.webContents.on('did-finish-load', () => {
-    console.log('[Electron] Overlay Desktop transparent chargé avec succès')
-  })
-
   overlayWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     console.error(`[Electron] Échec chargement Overlay (${errorCode}): ${errorDescription} - ${validatedURL}`)
   })
@@ -119,7 +114,6 @@ function createOverlayWindow() {
   const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:3000'
 
   if (isDev) {
-    console.log('[Electron] Chargement Overlay Desktop (Dev):', `${rendererUrl}/#/overlay`)
     overlayWindow.loadURL(`${rendererUrl}/#/overlay`)
   } else {
     overlayWindow.loadFile(path.join(__dirname, '../renderer/index.html'), { hash: 'overlay' })
@@ -368,8 +362,6 @@ function registerIpcHandlers() {
       previewTheme: customData?.previewTheme || null,
       isTest: true
     }
-
-    console.log('[Main] 🧪 Diffusion d\'un succès factice de test (Desktop + OBS uniquement) :', achievementData.displayName, customData?.previewTheme ? '(Mode Thème Preview)' : '')
 
     // A) Envoi prioritaire à l'overlay transparent en jeu (ÉCRAN)
     if (overlayWindow && !overlayWindow.isDestroyed()) {

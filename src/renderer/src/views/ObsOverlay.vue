@@ -76,7 +76,6 @@ function connectWebSocket() {
     socket = new WebSocket(wsUrl)
 
     socket.onopen = () => {
-      console.log('[ObsOverlay] ✔ Connecté au serveur OBS via', wsUrl)
       isConnected.value = true
       reconnectAttempts = 0
       socket.send(JSON.stringify({ type: 'OBS_CLIENT_READY' }))
@@ -87,10 +86,8 @@ function connectWebSocket() {
         const payload = JSON.parse(event.data)
 
         if (payload.type === 'CUSTOMIZATION_UPDATED' && payload.data) {
-          console.log('[ObsOverlay] 🎨 Mise à jour du thème reçue')
           currentTheme.value = payload.data
         } else if (payload.type === 'ACHIEVEMENT_UNLOCKED' && payload.data) {
-          console.log('[ObsOverlay] 🏆 Succès reçu :', payload.data.displayName)
           triggerAchievement(payload.data)
         }
       } catch (err) {

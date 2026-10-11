@@ -6,17 +6,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="back-icon">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
         </svg>
-        <span>Retour à la Bibliothèque</span>
+        <span>Retour</span>
       </button>
 
       <div class="editor-header-badges">
         <span v-if="isActiveTheme" class="status-badge-active">
           <span class="badge-dot pulse"></span>
-          Thème Actif sur Overlays
+          Thème actif
         </span>
         <span v-else class="status-badge-inactive">
           <span class="badge-dot"></span>
-          Thème en cours d'édition
+          Édition
         </span>
 
         <button
@@ -25,7 +25,7 @@
           title="Définir immédiatement comme thème actif pour les overlays"
           @click="activateCurrentTheme"
         >
-          Activer pour le stream
+          Activer
         </button>
       </div>
     </div>
@@ -40,17 +40,17 @@
         </div>
 
         <div class="theme-title-editor-wrap">
-          <label class="theme-name-label">Nom du thème</label>
+          <label class="theme-name-label">Nom</label>
           <div class="theme-name-input-row">
             <input
               v-model="theme.name"
               type="text"
               class="theme-name-input"
-              placeholder="Ex : Steam Gold Classique..."
+              placeholder="Nom du thème..."
               maxlength="45"
               @blur="autoSaveThemeName"
             />
-            <span class="theme-id-chip">ID: {{ theme.id }}</span>
+            <span class="theme-id-chip">{{ theme.id }}</span>
           </div>
         </div>
       </div>
@@ -61,13 +61,13 @@
           id="btn-test-notification"
           class="btn-test-primary"
           :disabled="isTesting"
-          title="Teste le code actuellement en cours d'édition sur Desktop et OBS"
+          title="Tester sur l'écran et sur OBS"
           @click="triggerTestNotification"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" class="btn-play-icon">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <span>{{ isTesting ? 'Diffusion...' : 'Tester ce thème' }}</span>
+          <span>{{ isTesting ? 'Diffusion...' : 'Tester' }}</span>
         </button>
       </div>
     </div>
@@ -80,31 +80,29 @@
           :class="{ active: activeTab === 'html' }"
           @click="activeTab = 'html'"
         >
-          <span>Code HTML</span>
-          <span class="tab-badge">Placeholders</span>
+          <span>HTML</span>
         </button>
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'css' }"
           @click="activeTab = 'css'"
         >
-          <span>Style CSS</span>
-          <span class="tab-badge">Animations</span>
+          <span>CSS</span>
         </button>
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'audio' }"
           @click="activeTab = 'audio'"
         >
-          <span>Son & Audio</span>
-          <span v-if="theme.audioPath" class="tab-badge audio-active">Custom</span>
+          <span>Audio</span>
+          <span v-if="theme.audioPath" class="tab-badge audio-active">Perso</span>
         </button>
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'preview' }"
           @click="activeTab = 'preview'"
         >
-          <span>Aperçu en Direct</span>
+          <span>Aperçu</span>
         </button>
       </div>
 
@@ -114,7 +112,7 @@
           Réinitialiser
         </button>
         <button class="btn-save" :disabled="isSaving" @click="saveCustomization">
-          {{ isSaving ? 'Enregistrement...' : 'Sauvegarder le thème' }}
+          {{ isSaving ? 'Enregistrement...' : 'Sauvegarder' }}
         </button>
       </div>
     </div>
@@ -122,11 +120,11 @@
     <!-- 1. Onglet HTML -->
     <div v-show="activeTab === 'html'" class="tab-pane">
       <div class="placeholders-bar">
-        <span class="pl-label">Insérer un placeholder :</span>
+        <span class="pl-label">Placeholders :</span>
         <div class="pl-buttons">
           <button
             class="btn-pl"
-            title="Titre du succès débloqué"
+            title="Titre du succès"
             @click="insertPlaceholder('{title}')"
           >
             + {title}
@@ -140,14 +138,14 @@
           </button>
           <button
             class="btn-pl"
-            title="URL de l'icône du succès"
+            title="URL de l'icône"
             @click="insertPlaceholder('{icon}')"
           >
             + {icon}
           </button>
           <button
             class="btn-pl"
-            title="Nom du jeu Steam"
+            title="Nom du jeu"
             @click="insertPlaceholder('{game}')"
           >
             + {game}
@@ -170,7 +168,7 @@
     <!-- 2. Onglet CSS -->
     <div v-show="activeTab === 'css'" class="tab-pane">
       <div class="css-info-banner">
-        <span>💡 <strong>Astuce :</strong> Utilisez les classes <code>.animate-enter</code> et <code>.animate-leave</code> pour vos animations d'entrée et de sortie. La notification dure 5 secondes par défaut.</span>
+        <span>💡 Utilisez les classes <code>.animate-enter</code> et <code>.animate-leave</code> pour vos animations (durée standard : 5s).</span>
       </div>
 
       <div class="code-editor-box">
@@ -191,21 +189,21 @@
           <div class="audio-status-box">
             <span class="audio-dot" :class="{ custom: theme.audioPath }"></span>
             <div>
-              <h4>Fichier audio de déblocage</h4>
+              <h4>Son de notification</h4>
               <p class="audio-sub">
-                {{ theme.audioPath ? 'Fichier personnalisé configuré' : 'Carillon synthétisé Web Audio par défaut' }}
+                {{ theme.audioPath ? 'Fichier personnalisé' : 'Son standard par défaut' }}
               </p>
             </div>
           </div>
 
           <div class="audio-file-actions">
             <button class="btn-select-file" @click="browseAudioFile">
-              📁 Choisir un fichier (.mp3, .wav, .ogg)
+              📁 Choisir un fichier
             </button>
             <button
               v-if="theme.audioPath"
               class="btn-clear-audio"
-              title="Revenir au carillon par défaut"
+              title="Revenir au son standard"
               @click="removeAudioFile"
             >
               ✕ Retirer
@@ -214,7 +212,7 @@
         </div>
 
         <div v-if="theme.audioPath" class="audio-file-path-row">
-          <span class="path-label">Chemin :</span>
+          <span class="path-label">Fichier :</span>
           <code class="path-text" :title="theme.audioPath">{{ theme.audioPath }}</code>
         </div>
 
@@ -225,12 +223,12 @@
             <label class="toggle-switch">
               <input v-model="theme.soundEnabled" type="checkbox" />
               <span class="slider"></span>
-              <span class="toggle-text">{{ theme.soundEnabled ? 'Son Activé' : 'Son Muet' }}</span>
+              <span class="toggle-text">{{ theme.soundEnabled ? 'Activé' : 'Muet' }}</span>
             </label>
           </div>
 
           <div class="setting-item">
-            <label class="setting-label">Volume sonore ({{ Math.round(theme.soundVolume * 100) }}%) :</label>
+            <label class="setting-label">Volume ({{ Math.round(theme.soundVolume * 100) }}%) :</label>
             <div class="volume-slider-row">
               <input
                 v-model.number="theme.soundVolume"
@@ -246,19 +244,19 @@
                 :disabled="!theme.soundEnabled"
                 @click="playTestSound"
               >
-                {{ isPlayingSound ? '🔊 Écoute...' : '▶ Écouter' }}
+                {{ isPlayingSound ? '🔊 Test...' : '▶ Tester' }}
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Sélecteur de sortie audio (Wave Link / Casque / Périphérique Windows) -->
+        <!-- Sélecteur de sortie audio -->
         <div class="device-selector-card">
           <div class="setting-item">
             <div class="device-label-row">
               <label class="setting-label">Sortie audio de l'application :</label>
-              <button class="btn-refresh-devices" title="Actualiser la liste des périphériques" @click="refreshAudioDevices">
-                🔄 Détecter
+              <button class="btn-refresh-devices" title="Actualiser les périphériques" @click="refreshAudioDevices">
+                🔄 Actualiser
               </button>
             </div>
             <select
@@ -271,24 +269,16 @@
               </option>
             </select>
             <p class="device-hint">
-              💡 <strong>Wave Link / Casque</strong> : Sélectionnez le canal où vous souhaitez entendre la notification (ex : <em>Wave Link SFX</em> ou votre sortie casque habituelle).
+              Sélectionnez le canal de sortie audio souhaité (casque, Wave Link SFX, etc.).
             </p>
           </div>
         </div>
 
-        <!-- Astuces de routage audio pour OBS Studio -->
+        <!-- Astuce discrète OBS Studio -->
         <div class="obs-sound-tips-card">
-          <div class="tips-header">
-            <span>📺 Comment entendre le son dans OBS Studio & Wave Link :</span>
-          </div>
-          <ul class="tips-list">
-            <li>
-              <strong>Option 1 (Le plus simple) :</strong> Dans les propriétés de la source navigateur OBS, <em>décochez</em> <code>Contrôler l'audio via OBS</code>. Le son passera directement par Windows sur votre sortie audio habituelle.
-            </li>
-            <li>
-              <strong>Option 2 (Mixage OBS / Wave Link) :</strong> Si <code>Contrôler l'audio via OBS</code> est <em>coché</em> (les barres vertes bougent dans OBS), allez dans le Mélangeur Audio OBS &gt; ⚙️ Propriétés audio avancées &gt; réglez la source navigateur sur <strong>"Surveillance et sortie"</strong>.
-            </li>
-          </ul>
+          <p class="tips-note">
+            💡 <strong>OBS Studio</strong> : Si vous activez <em>"Contrôler l'audio via OBS"</em> dans votre source navigateur, réglez-la sur <strong>"Surveillance et sortie"</strong> dans le Mélangeur Audio pour l'entendre dans votre casque.
+          </p>
         </div>
       </div>
     </div>
@@ -302,7 +292,7 @@
         </component>
 
         <div class="preview-backdrop">
-          <div class="preview-watermark">Aperçu en direct (Zone transparente)</div>
+          <div class="preview-watermark">Aperçu en direct</div>
           <!-- Slot d'aperçu dynamique -->
           <div class="preview-slot" v-html="previewHtml"></div>
         </div>
@@ -1248,25 +1238,17 @@ input:checked + .slider::before {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  padding: 0.85rem 1rem;
+  padding: 0.65rem 0.85rem;
 }
 
-.tips-header {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #66c0f4;
-  margin-bottom: 0.35rem;
-}
-
-.tips-list {
+.tips-note {
   margin: 0;
-  padding-left: 1.2rem;
   font-size: 0.74rem;
   color: #a4b4cc;
   line-height: 1.45;
 }
 
-.tips-list code {
+.tips-note code {
   color: #f0c330;
   background: rgba(0, 0, 0, 0.4);
   padding: 0.05rem 0.3rem;

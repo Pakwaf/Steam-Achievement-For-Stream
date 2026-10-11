@@ -50,7 +50,6 @@ onMounted(async () => {
     // 2. Écouter les mises à jour en direct du thème
     if (window.steamAPI.onCustomizationUpdated) {
       const unsubTheme = window.steamAPI.onCustomizationUpdated((newTheme) => {
-        console.log('[DesktopOverlay] 🎨 Mise à jour du thème reçue')
         currentTheme.value = { ...DEFAULT_THEME, ...newTheme }
       })
       unsubs.push(unsubTheme)
@@ -59,7 +58,6 @@ onMounted(async () => {
     // 3. Écouter les succès débloqués (réels ou tests)
     if (window.steamAPI.onAchievementUnlocked) {
       const unsubAch = window.steamAPI.onAchievementUnlocked((achievement) => {
-        console.log('[DesktopOverlay] 🏆 Succès reçu sur l\'overlay écran :', achievement.displayName)
         triggerAchievement(achievement)
       })
       unsubs.push(unsubAch)

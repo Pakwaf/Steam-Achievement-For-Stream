@@ -82,8 +82,6 @@ export class SettingsService {
     process.env.STEAM_API_KEY = trimmed
     this.persist()
 
-    console.log(`[SettingsService] 🔑 Clé Steam API mise à jour : ${trimmed ? `${trimmed.substring(0, 4)}... (32 car.)` : 'Vidé'}`)
-
     return {
       success: true,
       apiKey: trimmed,
