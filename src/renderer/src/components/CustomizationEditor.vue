@@ -410,7 +410,7 @@ function autoSaveThemeName() {
 
 // Actualise la liste des sorties audio du système
 async function refreshAudioDevices() {
-  const outputs = await getAudioOutputDevices()
+  const outputs = await getAudioOutputDevices(true)
   if (outputs.length > 0) {
     audioDevices.value = outputs
   }

@@ -136,6 +136,17 @@ async fn update_customization(
     Ok(true)
 }
 
+#[tauri::command]
+async fn select_audio_file() -> Result<Option<String>, String> {
+    let file = rfd::AsyncFileDialog::new()
+        .add_filter("Fichiers Audio", &["mp3", "wav", "ogg", "aac", "flac", "m4a"])
+        .set_title("Sélectionner un fichier audio pour la notification")
+        .pick_file()
+        .await;
+
+    Ok(file.map(|f| f.path().to_string_lossy().to_string()))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let tracker = Arc::new(AchievementTracker::new());
@@ -170,6 +181,7 @@ pub fn run() {
             save_steam_api_key,
             open_external,
             update_customization,
+            select_audio_file,
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

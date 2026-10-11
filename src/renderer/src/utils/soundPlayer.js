@@ -28,26 +28,61 @@ export async function getAudioContext() {
  * Récupère la liste des périphériques de sortie audio disponibles sous Windows
  * (ex: Sortie par défaut, Elgato Wave Link SFX, Casque, Enceintes, etc.)
  */
-export async function getAudioOutputDevices() {
-  if (!navigator.mediaDevices?.enumerateDevices) return []
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    const outputs = devices
-      .filter((d) => d.kind === 'audiooutput')
-      .map((d, index) => ({
-        deviceId: d.deviceId,
-        label: d.label || (d.deviceId === 'default' ? 'Périphérique Windows par défaut' : `Sortie audio #${index + 1}`)
-      }))
+export async function getAudioOutputDevices(forcePrompt = false) {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+    return [{ deviceId: 'default', label: 'Périphérique Windows par défaut' }]
+  }
 
-    // S'assurer qu'au moins l'option par défaut existe
-    if (!outputs.some((d) => d.deviceId === 'default')) {
-      outputs.unshift({
+  try {
+    let devices = await navigator.mediaDevices.enumerateDevices()
+    let outputs = devices.filter((d) => d.kind === 'audiooutput')
+
+    // Si les étiquettes sont masquées par WebView2 ou si seul 'default' apparaît, débloquer l'accès
+    const hasLabels = outputs.some((d) => d.label && d.label.trim().length > 0)
+    if ((!hasLabels || outputs.length <= 1 || forcePrompt) && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop())
+        }
+        devices = await navigator.mediaDevices.enumerateDevices()
+        outputs = devices.filter((d) => d.kind === 'audiooutput')
+      } catch (err) {
+        // En cas de refus ou d'absence de micro, continuer avec les périphériques obtenus
+      }
+    }
+
+    const mapped = outputs
+      .map((d, index) => {
+        let label = d.label ? d.label.trim() : ''
+        if (!label) {
+          label = d.deviceId === 'default' ? 'Périphérique Windows par défaut' : `Sortie audio #${index + 1}`
+        }
+        return {
+          deviceId: d.deviceId,
+          label
+        }
+      })
+      .filter((d) => Boolean(d.deviceId))
+
+    if (!mapped.some((d) => d.deviceId === 'default')) {
+      mapped.unshift({
         deviceId: 'default',
         label: 'Périphérique Windows par défaut'
       })
     }
 
-    return outputs
+    // Dédupliquer par deviceId
+    const seen = new Set()
+    const unique = []
+    for (const item of mapped) {
+      if (!seen.has(item.deviceId)) {
+        seen.add(item.deviceId)
+        unique.push(item)
+      }
+    }
+
+    return unique
   } catch (err) {
     console.warn('[SoundPlayer] Impossible d\'énumérer les périphériques audio:', err)
     return [{ deviceId: 'default', label: 'Périphérique Windows par défaut' }]

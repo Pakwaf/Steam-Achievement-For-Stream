@@ -156,6 +156,18 @@ export const steamAPI = {
     }
   },
 
+  selectAudioFile: async () => {
+    try {
+      const filePath = await invoke('select_audio_file')
+      if (filePath) {
+        return { success: true, filePath }
+      }
+      return { success: false, canceled: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  },
+
   getAudioData: async () => {
     return { hasAudio: false, dataUrl: null }
   },
