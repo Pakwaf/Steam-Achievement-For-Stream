@@ -209,6 +209,45 @@
             </div>
           </div>
         </div>
+
+        <!-- Sélecteur de sortie audio (Wave Link / Casque / Périphérique Windows) -->
+        <div class="device-selector-card">
+          <div class="setting-item">
+            <div class="device-label-row">
+              <label class="setting-label">Sortie audio de l'application :</label>
+              <button class="btn-refresh-devices" title="Actualiser la liste des périphériques" @click="refreshAudioDevices">
+                🔄 Détecter
+              </button>
+            </div>
+            <select
+              v-model="theme.audioDeviceId"
+              class="device-select"
+              @change="onAudioDeviceChange"
+            >
+              <option v-for="dev in audioDevices" :key="dev.deviceId" :value="dev.deviceId">
+                {{ dev.label }}
+              </option>
+            </select>
+            <p class="device-hint">
+              💡 <strong>Wave Link / Casque</strong> : Sélectionnez le canal où vous souhaitez entendre la notification (ex : <em>Wave Link SFX</em> ou votre sortie casque).
+            </p>
+          </div>
+        </div>
+
+        <!-- Astuces de routage audio pour OBS Studio -->
+        <div class="obs-sound-tips-card">
+          <div class="tips-header">
+            <span>📺 Comment entendre le son dans OBS Studio & Wave Link :</span>
+          </div>
+          <ul class="tips-list">
+            <li>
+              <strong>Option 1 (Le plus simple) :</strong> Dans les propriétés de la source navigateur OBS, <em>décochez</em> <code>Contrôler l'audio via OBS</code>. Le son passera directement par Windows sur votre sortie audio habituelle.
+            </li>
+            <li>
+              <strong>Option 2 (Mixage OBS / Wave Link) :</strong> Si <code>Contrôler l'audio via OBS</code> est <em>coché</em> (les barres vertes bougent dans OBS), allez dans le Mélangeur Audio OBS &gt; ⚙️ Propriétés audio avancées &gt; réglez la source navigateur sur <strong>"Surveillance et sortie"</strong>. Vérifiez ensuite dans OBS Paramètres &gt; Audio &gt; que le <em>Périphérique de surveillance</em> est bien activé sur Wave Link.
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -232,6 +271,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { playAchievementSound, getAudioOutputDevices } from '../utils/soundPlayer.js'
+import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 
 const emit = defineEmits(['test'])
 
@@ -246,9 +287,14 @@ const theme = ref({
   html: '',
   css: '',
   audioPath: null,
+  audioDeviceId: 'default',
   soundEnabled: true,
   soundVolume: 0.8
 })
+
+const audioDevices = ref([
+  { deviceId: 'default', label: 'Périphérique Windows par défaut' }
+])
 
 const testData = {
   displayName: 'Ceci est un test',
@@ -268,17 +314,39 @@ const previewHtml = computed(() => {
 })
 
 onMounted(async () => {
+  // 1. Détection des périphériques audio (Wave Link / Windows)
+  await refreshAudioDevices()
+
+  // 2. Chargement du thème personnalisé sauvegardé
   if (window.steamAPI?.getCustomization) {
     try {
       const saved = await window.steamAPI.getCustomization()
       if (saved) {
-        theme.value = { ...saved }
+        theme.value = {
+          ...DEFAULT_THEME,
+          ...saved,
+          audioDeviceId: saved.audioDeviceId || 'default'
+        }
       }
     } catch (err) {
       console.error('[CustomizationEditor] Erreur chargement thème:', err)
     }
   }
 })
+
+// Actualise la liste des sorties audio du système
+async function refreshAudioDevices() {
+  const outputs = await getAudioOutputDevices()
+  if (outputs.length > 0) {
+    audioDevices.value = outputs
+  }
+}
+
+// Changement de périphérique audio
+function onAudioDeviceChange() {
+  saveCustomization()
+  showStatus('Sortie audio mise à jour ✔')
+}
 
 // Insertion ergonomique des placeholders à l'emplacement du curseur
 function insertPlaceholder(placeholder) {
@@ -307,104 +375,41 @@ async function browseAudioFile() {
     if (res.success && res.filePath) {
       theme.value.audioPath = res.filePath
       showStatus('Fichier audio sélectionné ✔')
-      // Auto-sauvegarde du nouveau chemin audio
-      saveCustomization()
+      // Auto-sauvegarde immédiate du nouveau chemin audio
+      await saveCustomization()
+      // Jouer immédiatement le nouveau son sélectionné pour confirmation auditive
+      await playTestSound()
     }
   } catch (err) {
     console.error('[CustomizationEditor] Erreur sélection audio:', err)
   }
 }
 
-function removeAudioFile() {
+async function removeAudioFile() {
   theme.value.audioPath = null
   showStatus('Fichier audio retiré (retour au carillon par défaut)')
-  saveCustomization()
+  await saveCustomization()
+  await playTestSound()
 }
 
-// Joue un test du son sélectionné
+// Joue un test du son sélectionné via le moteur audio fiable
 async function playTestSound() {
   if (!theme.value.soundEnabled || isPlayingSound.value) return
   isPlayingSound.value = true
 
-  const volume = theme.value.soundVolume ?? 0.8
-
-  if (theme.value.audioPath) {
-    // 1. Essayer d'abord la récupération directe en Data URL Base64 (100% fiable en Electron)
-    if (window.steamAPI?.getAudioData) {
-      try {
-        const audioInfo = await window.steamAPI.getAudioData()
-        if (audioInfo?.hasAudio && audioInfo.dataUrl) {
-          const audio = new Audio(audioInfo.dataUrl)
-          audio.volume = volume
-          audio.onended = () => { isPlayingSound.value = false }
-          audio.onerror = () => {
-            playDefaultChime(volume)
-            isPlayingSound.value = false
-          }
-          await audio.play()
-          return
-        }
-      } catch (err) {
-        console.warn('[CustomizationEditor] Échec lecture audio locale Base64:', err)
-      }
-    }
-
-    // 2. Fallback via le serveur HTTP local
-    try {
-      const audio = new Audio(`http://127.0.0.1:8080/audio/custom?t=${Date.now()}`)
-      audio.volume = volume
-      audio.onended = () => { isPlayingSound.value = false }
-      audio.onerror = () => {
-        playDefaultChime(volume)
-        isPlayingSound.value = false
-      }
-      await audio.play()
-      return
-    } catch {
-      await playDefaultChime(volume)
-      isPlayingSound.value = false
-      return
-    }
-  }
-
-  // Si aucun fichier personnalisé ou fallback
-  await playDefaultChime(volume)
-  setTimeout(() => { isPlayingSound.value = false }, 800)
-}
-
-async function playDefaultChime(vol = 0.8) {
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
-    if (ctx.state === 'suspended') {
-      await ctx.resume()
-    }
-    const now = ctx.currentTime
-
-    const osc1 = ctx.createOscillator()
-    const gain1 = ctx.createGain()
-    osc1.type = 'sine'
-    osc1.frequency.setValueAtTime(587.33, now)
-    gain1.gain.setValueAtTime(0.08 * vol, now)
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
-    osc1.connect(gain1)
-    gain1.connect(ctx.destination)
-    osc1.start(now)
-    osc1.stop(now + 0.5)
-
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.type = 'sine'
-    osc2.frequency.setValueAtTime(880.00, now + 0.12)
-    gain2.gain.setValueAtTime(0.09 * vol, now + 0.12)
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7)
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.start(now + 0.12)
-    osc2.stop(now + 0.75)
+    await playAchievementSound({
+      soundEnabled: true,
+      soundVolume: theme.value.soundVolume,
+      audioPath: theme.value.audioPath,
+      audioDeviceId: theme.value.audioDeviceId
+    })
   } catch (err) {
-    console.warn('[CustomizationEditor] Erreur Web Audio:', err)
+    console.error('[CustomizationEditor] Erreur test son:', err)
+  } finally {
+    setTimeout(() => {
+      isPlayingSound.value = false
+    }, 900)
   }
 }
 
@@ -436,7 +441,7 @@ async function resetToDefault() {
     if (window.steamAPI?.resetCustomization) {
       const res = await window.steamAPI.resetCustomization()
       if (res.success && res.theme) {
-        theme.value = { ...res.theme }
+        theme.value = { ...DEFAULT_THEME, ...res.theme }
         showStatus('Thème par défaut restauré ✔')
       }
     }
@@ -445,10 +450,18 @@ async function resetToDefault() {
   }
 }
 
-// Déclenche le faux succès de test dans tout le pipeline
+// Déclenche le faux succès de test dans tout le pipeline (Dashboard + Overlay Desktop + OBS)
 async function triggerTestNotification() {
   if (isTesting.value) return
   isTesting.value = true
+
+  // Jouer également le son immédiatement dans la fenêtre active pour retour instantané
+  playAchievementSound({
+    soundEnabled: theme.value.soundEnabled,
+    soundVolume: theme.value.soundVolume,
+    audioPath: theme.value.audioPath,
+    audioDeviceId: theme.value.audioDeviceId
+  })
 
   try {
     if (window.steamAPI?.broadcastTestAchievement) {
@@ -941,6 +954,94 @@ function showStatus(msg) {
 
 .btn-play-test-sound:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.18);
+}
+
+/* Carte de sélection de sortie audio */
+.device-selector-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(102, 192, 244, 0.2);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.device-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-refresh-devices {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #a4b4cc;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-refresh-devices:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.device-select {
+  background: #090d13;
+  color: #fff;
+  border: 1px solid rgba(102, 192, 244, 0.35);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.device-select:focus {
+  border-color: #66c0f4;
+  box-shadow: 0 0 10px rgba(102, 192, 244, 0.3);
+}
+
+.device-hint {
+  font-size: 0.78rem;
+  color: #a4b4cc;
+  line-height: 1.4;
+  margin-top: 0.25rem;
+}
+
+/* Astuces OBS Studio */
+.obs-sound-tips-card {
+  background: rgba(20, 28, 40, 0.7);
+  border: 1px solid rgba(240, 195, 48, 0.3);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tips-header {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f0c330;
+}
+
+.tips-list {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tips-list code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  color: #66c0f4;
 }
 
 /* Onglet Aperçu */

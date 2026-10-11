@@ -190,6 +190,7 @@ export const DEFAULT_THEME = {
 }`,
 
   audioPath: null,
+  audioDeviceId: 'default',
   soundEnabled: true,
   soundVolume: 0.8
 }
@@ -226,6 +227,7 @@ export class CustomizationService {
         html: parsed.html || DEFAULT_THEME.html,
         css: parsed.css || DEFAULT_THEME.css,
         audioPath: parsed.audioPath || null,
+        audioDeviceId: parsed.audioDeviceId || 'default',
         soundEnabled: parsed.soundEnabled ?? true,
         soundVolume: typeof parsed.soundVolume === 'number' ? parsed.soundVolume : 0.8
       }
@@ -240,7 +242,8 @@ export class CustomizationService {
     this.currentTheme = {
       html: data.html || DEFAULT_THEME.html,
       css: data.css || DEFAULT_THEME.css,
-      audioPath: data.audioPath ?? this.currentTheme.audioPath,
+      audioPath: data.audioPath !== undefined ? data.audioPath : this.currentTheme.audioPath,
+      audioDeviceId: data.audioDeviceId ?? this.currentTheme.audioDeviceId ?? 'default',
       soundEnabled: data.soundEnabled ?? this.currentTheme.soundEnabled,
       soundVolume: typeof data.soundVolume === 'number' ? data.soundVolume : this.currentTheme.soundVolume
     }

@@ -1,35 +1,27 @@
 <template>
   <div class="desktop-overlay-container">
-    <!-- Style CSS utilisateur injecté dynamiquement -->
+    <!-- Style CSS utilisateur injecté dynamiquement avec fallback garanti -->
     <component :is="'style'">
-      {{ currentTheme.css || '' }}
+      {{ currentTheme.css || DEFAULT_THEME.css }}
     </component>
 
-    <!-- Rendu HTML dynamique du succès avec placeholders remplacés -->
+    <!-- Zone de rendu plein écran pour la notification de succès sur l'écran du joueur -->
     <div
-      v-if="isDisplaying && renderedHtml"
-      class="dynamic-achievement-wrapper"
-      :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
+      ref="slotRef"
+      class="desktop-achievement-slot"
       v-html="renderedHtml"
     ></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { DEFAULT_THEME } from '../utils/defaultTheme.js'
+import { playAchievementSound } from '../utils/soundPlayer.js'
 
-const currentTheme = ref({
-  html: '',
-  css: '',
-  audioPath: null,
-  soundEnabled: true,
-  soundVolume: 0.8
-})
-
-const isDisplaying = ref(false)
-const isEntering = ref(false)
-const isLeaving = ref(false)
+const currentTheme = ref({ ...DEFAULT_THEME })
 const renderedHtml = ref('')
+const slotRef = ref(null)
 
 let unsubs = []
 let dismissTimer = null
@@ -38,7 +30,7 @@ let leaveTimer = null
 const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
 onMounted(async () => {
-  // Transparence complète
+  // Transparence complète pour le jeu
   document.body.classList.add('transparent-view')
   document.documentElement.classList.add('transparent-view')
 
@@ -47,7 +39,9 @@ onMounted(async () => {
     try {
       if (window.steamAPI.getCustomization) {
         const theme = await window.steamAPI.getCustomization()
-        if (theme) currentTheme.value = theme
+        if (theme && (theme.html || theme.css)) {
+          currentTheme.value = { ...DEFAULT_THEME, ...theme }
+        }
       }
     } catch (err) {
       console.error('[DesktopOverlay] Erreur chargement thème:', err)
@@ -57,7 +51,7 @@ onMounted(async () => {
     if (window.steamAPI.onCustomizationUpdated) {
       const unsubTheme = window.steamAPI.onCustomizationUpdated((newTheme) => {
         console.log('[DesktopOverlay] 🎨 Mise à jour du thème reçue')
-        currentTheme.value = newTheme
+        currentTheme.value = { ...DEFAULT_THEME, ...newTheme }
       })
       unsubs.push(unsubTheme)
     }
@@ -65,7 +59,7 @@ onMounted(async () => {
     // 3. Écouter les succès débloqués (réels ou tests)
     if (window.steamAPI.onAchievementUnlocked) {
       const unsubAch = window.steamAPI.onAchievementUnlocked((achievement) => {
-        console.log('[DesktopOverlay] 🏆 Succès reçu :', achievement.displayName)
+        console.log('[DesktopOverlay] 🏆 Succès reçu sur l\'overlay écran :', achievement.displayName)
         triggerAchievement(achievement)
       })
       unsubs.push(unsubAch)
@@ -78,26 +72,38 @@ function triggerAchievement(achievement) {
   if (dismissTimer) clearTimeout(dismissTimer)
   if (leaveTimer) clearTimeout(leaveTimer)
 
-  // 1. Jouer le son
-  playNotificationSound()
+  // 1. Jouer le son configuré via le moteur audio fiable
+  playAchievementSound(currentTheme.value)
 
-  // 2. Remplacer les placeholders {title}, {description}, {icon}, {game}
-  renderedHtml.value = replacePlaceholders(currentTheme.value.html, achievement)
-  isDisplaying.value = true
-  isEntering.value = true
-  isLeaving.value = false
+  // 2. Remplacer les placeholders {title}, {description}, {icon}, {game} avec fallback garanti
+  const tpl = (currentTheme.value.html && currentTheme.value.html.trim())
+    ? currentTheme.value.html
+    : DEFAULT_THEME.html
 
-  // 3. Après 5 secondes : animation de sortie
+  renderedHtml.value = replacePlaceholders(tpl, achievement)
+
+  // 3. Appliquer l'animation d'entrée directement sur la carte racine (évite tout bug de containing block)
+  nextTick(() => {
+    const rootNode = slotRef.value?.firstElementChild
+    if (rootNode) {
+      rootNode.classList.remove('animate-leave')
+      void rootNode.offsetWidth // Force reflow pour relancer l'animation
+      rootNode.classList.add('animate-enter')
+    }
+  })
+
+  // 4. Après 5 secondes : animation de sortie puis masquage
   dismissTimer = setTimeout(() => {
-    isEntering.value = false
-    isLeaving.value = true
+    const rootNode = slotRef.value?.firstElementChild
+    if (rootNode) {
+      rootNode.classList.remove('animate-enter')
+      rootNode.classList.add('animate-leave')
+    }
 
-    // 4. Fin de l'animation de sortie : masquage
+    // 5. Fin de l'animation de sortie : nettoyage du HTML
     leaveTimer = setTimeout(() => {
-      isDisplaying.value = false
-      isLeaving.value = false
       renderedHtml.value = ''
-    }, 400)
+    }, 450)
   }, 5000)
 }
 
@@ -119,81 +125,6 @@ function escapeHtml(text) {
   if (!text) return ''
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
   return text.toString().replace(/[&<>"']/g, (m) => map[m])
-}
-
-// Joue le son personnalisé via Base64 ou l'endpoint local ou le carillon Web Audio
-async function playNotificationSound() {
-  if (!currentTheme.value.soundEnabled) return
-
-  const volume = currentTheme.value.soundVolume ?? 0.8
-
-  // 1. Essayer d'abord la récupération directe en Data URL Base64
-  if (currentTheme.value.audioPath && window.steamAPI?.getAudioData) {
-    try {
-      const audioInfo = await window.steamAPI.getAudioData()
-      if (audioInfo?.hasAudio && audioInfo.dataUrl) {
-        const audio = new Audio(audioInfo.dataUrl)
-        audio.volume = volume
-        audio.onerror = () => { playDefaultChime(volume) }
-        await audio.play()
-        return
-      }
-    } catch (err) {
-      console.warn('[DesktopOverlay] Échec lecture audio Base64:', err)
-    }
-  }
-
-  // 2. Fallback endpoint HTTP local
-  if (currentTheme.value.audioPath) {
-    try {
-      const audioUrl = `http://127.0.0.1:8080/audio/custom?t=${Date.now()}`
-      const audio = new Audio(audioUrl)
-      audio.volume = volume
-      audio.onerror = () => { playDefaultChime(volume) }
-      await audio.play()
-      return
-    } catch {
-      await playDefaultChime(volume)
-      return
-    }
-  }
-
-  // 3. Fallback carillon synthétisé Web Audio
-  await playDefaultChime(volume)
-}
-
-async function playDefaultChime(vol = 0.8) {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
-    if (ctx.state === 'suspended') {
-      await ctx.resume()
-    }
-    const now = ctx.currentTime
-
-    const osc1 = ctx.createOscillator()
-    const gain1 = ctx.createGain()
-    osc1.type = 'sine'
-    osc1.frequency.setValueAtTime(587.33, now) // D5
-    gain1.gain.setValueAtTime(0.08 * vol, now)
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
-    osc1.connect(gain1)
-    gain1.connect(ctx.destination)
-    osc1.start(now)
-    osc1.stop(now + 0.5)
-
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.type = 'sine'
-    osc2.frequency.setValueAtTime(880.00, now + 0.12) // A5
-    gain2.gain.setValueAtTime(0.09 * vol, now + 0.12)
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7)
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.start(now + 0.12)
-    osc2.stop(now + 0.75)
-  } catch {}
 }
 
 onUnmounted(() => {
@@ -219,7 +150,15 @@ onUnmounted(() => {
   position: relative;
 }
 
-.dynamic-achievement-wrapper {
+.desktop-achievement-slot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 </style>

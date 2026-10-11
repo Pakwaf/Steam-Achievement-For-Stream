@@ -364,6 +364,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import CustomizationEditor from '../components/CustomizationEditor.vue'
+import { playAchievementSound } from '../utils/soundPlayer.js'
 
 const currentUser = ref(null)
 const isLoading = ref(false)
@@ -415,9 +416,18 @@ onMounted(async () => {
       currentUser.value = user
     })
 
-    // Écoute des succès débloqués en temps réel
-    window.steamAPI.onAchievementUnlocked((achievement) => {
+    // Écoute des succès débloqués en temps réel (réels ou tests)
+    window.steamAPI.onAchievementUnlocked(async (achievement) => {
       triggerAchievementToast(achievement)
+      try {
+        let theme = null
+        if (window.steamAPI?.getCustomization) {
+          theme = await window.steamAPI.getCustomization()
+        }
+        await playAchievementSound(theme || {})
+      } catch (err) {
+        console.warn('[Dashboard] Erreur lecture audio succès:', err)
+      }
     })
 
     // Écoute en temps réel des connexions/déconnexions de sources OBS

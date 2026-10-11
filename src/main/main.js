@@ -34,7 +34,8 @@ function createMainWindow() {
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     }
   })
 
@@ -94,7 +95,8 @@ function createOverlayWindow() {
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     }
   })
 
@@ -102,6 +104,15 @@ function createOverlayWindow() {
   overlayWindow.setIgnoreMouseEvents(true, { forward: true })
   // Garder au premier plan absolu (même au-dessus des jeux plein écran sans bordure)
   overlayWindow.setAlwaysOnTop(true, 'screen-saver')
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  overlayWindow.webContents.on('did-finish-load', () => {
+    console.log('[Electron] Overlay Desktop transparent chargé avec succès')
+  })
+
+  overlayWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron] Échec chargement Overlay (${errorCode}): ${errorDescription} - ${validatedURL}`)
+  })
 
   const isDev = !app.isPackaged
   const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:3000'
@@ -186,6 +197,9 @@ function registerIpcHandlers() {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.webContents.send('customization:updated', saved)
     }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('customization:updated', saved)
+    }
     obsServer.broadcastCustomization(saved)
     return { success: true, theme: saved }
   })
@@ -195,6 +209,9 @@ function registerIpcHandlers() {
     const defaultTheme = customizationService.reset()
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.webContents.send('customization:updated', defaultTheme)
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('customization:updated', defaultTheme)
     }
     obsServer.broadcastCustomization(defaultTheme)
     return { success: true, theme: defaultTheme }
@@ -235,13 +252,14 @@ function registerIpcHandlers() {
         const mimeType = mimeMap[ext] || 'audio/mpeg'
         return {
           hasAudio: true,
-          dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`
+          dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
+          rawBuffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
         }
       } catch (err) {
         console.warn('[Main] Impossible de charger le fichier audio en Base64:', err.message)
       }
     }
-    return { hasAudio: false, dataUrl: null }
+    return { hasAudio: false, dataUrl: null, rawBuffer: null }
   })
 
   // 13. Diffusion d'un faux succès de test dans tout le pipeline (Desktop + OBS + Logs)

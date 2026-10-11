@@ -67,13 +67,14 @@ export class ObsServer {
 
       // Envoyer le thème de personnalisation actif dès la connexion
       const theme = customizationService.getTheme()
+      const hasAudio = Boolean(theme.audioPath && fs.existsSync(theme.audioPath))
       ws.send(JSON.stringify({
         type: 'CUSTOMIZATION_UPDATED',
         data: {
           html: theme.html || DEFAULT_THEME.html,
           css: theme.css || DEFAULT_THEME.css,
-          hasAudio: Boolean(theme.audioPath && fs.existsSync(theme.audioPath)),
-          audioUrl: '/audio/custom',
+          hasAudio,
+          audioUrl: hasAudio ? `/audio/custom?_v=${Date.now()}` : null,
           soundEnabled: theme.soundEnabled,
           soundVolume: theme.soundVolume
         }
@@ -109,13 +110,14 @@ export class ObsServer {
     // 4. Routes pour OBS : acceptent '/', '/obs', '/obs/'
     const serveOverlay = (_req, res) => {
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
       res.send(this.getObsOverlayHtml())
     }
     this.app.get('/', serveOverlay)
     this.app.get('/obs', serveOverlay)
     this.app.get('/obs/', serveOverlay)
 
-    // 5. Route pour servir le fichier audio personnalisé sélectionné par l'utilisateur
+    // 5. Route pour servir le fichier audio personnalisé sélectionné par l'utilisateur (sans aucun cache)
     this.app.get('/audio/custom', (_req, res) => {
       const theme = customizationService.getTheme()
       if (theme.audioPath && fs.existsSync(theme.audioPath)) {
@@ -130,6 +132,9 @@ export class ObsServer {
         }
         res.setHeader('Content-Type', mimeMap[ext] || 'audio/mpeg')
         res.setHeader('Accept-Ranges', 'bytes')
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
+        res.setHeader('Pragma', 'no-cache')
+        res.setHeader('Expires', '0')
         res.sendFile(path.resolve(theme.audioPath))
       } else {
         res.status(404).json({ error: 'Aucun fichier audio personnalisé' })
@@ -184,13 +189,14 @@ export class ObsServer {
    * @param {Object} themeData 
    */
   broadcastCustomization(themeData) {
+    const hasAudio = Boolean(themeData.audioPath && fs.existsSync(themeData.audioPath))
     const payload = JSON.stringify({
       type: 'CUSTOMIZATION_UPDATED',
       data: {
         html: themeData.html,
         css: themeData.css,
-        hasAudio: Boolean(themeData.audioPath && fs.existsSync(themeData.audioPath)),
-        audioUrl: `/audio/custom?t=${Date.now()}`,
+        hasAudio,
+        audioUrl: hasAudio ? `/audio/custom?_v=${Date.now()}` : null,
         soundEnabled: themeData.soundEnabled,
         soundVolume: themeData.soundVolume
       }
@@ -370,6 +376,9 @@ ${theme.css || DEFAULT_THEME.css}
 
     <!-- Zone de rendu dynamique du succès personnalisé -->
     <div id="achievement-slot"></div>
+
+    <!-- Élément audio persistant dans le DOM pour OBS -->
+    <audio id="obs-audio-element" style="display:none;" preload="auto"></audio>
   </div>
 
   <script>
@@ -381,17 +390,61 @@ ${theme.css || DEFAULT_THEME.css}
     const achSlot = document.getElementById('achievement-slot');
     const customCssElem = document.getElementById('custom-theme-css');
 
+    const initialHasAudio = ${Boolean(theme.audioPath && fs.existsSync(theme.audioPath))};
     let currentHtmlTemplate = ${JSON.stringify(theme.html || DEFAULT_THEME.html)};
     let soundSettings = {
-      hasAudio: ${Boolean(theme.audioPath && fs.existsSync(theme.audioPath))},
-      audioUrl: '/audio/custom',
+      hasAudio: initialHasAudio,
+      audioUrl: initialHasAudio ? '/audio/custom?_v=' + Date.now() : null,
       soundEnabled: ${Boolean(theme.soundEnabled)},
       soundVolume: ${theme.soundVolume ?? 0.8}
     };
 
+    let audioCtx = null;
+    let customAudioBuffer = null;
     let toastTimeout = null;
     let ws = null;
     let reconnectAttempts = 0;
+
+    // Contexte Web Audio API partagé et résilient pour OBS CEF
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) audioCtx = new AudioCtx();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(function() {});
+      }
+      return audioCtx;
+    }
+
+    // Précharge et décode le fichier audio en mémoire vive dès le chargement ou la mise à jour
+    async function preloadAudioFile(url) {
+      if (!url) {
+        customAudioBuffer = null;
+        return;
+      }
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+
+      try {
+        const sep = url.indexOf('?') !== -1 ? '&' : '?';
+        const fetchUrl = url + sep + '_obs=' + Date.now();
+        console.log('[OBS Sound] 📥 Chargement du fichier audio en cours :', fetchUrl);
+        const res = await fetch(fetchUrl);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const arrayBuf = await res.arrayBuffer();
+        customAudioBuffer = await ctx.decodeAudioData(arrayBuf);
+        console.log('[OBS Sound] ✔ Nouveau fichier audio personnalisé décodé et prêt en mémoire !');
+      } catch (err) {
+        console.warn('[OBS Sound] Impossible de charger l\'audio personnalisé, repli prévu:', err.message);
+        customAudioBuffer = null;
+      }
+    }
+
+    // Préchargement initial dès le démarrage de la page OBS
+    if (soundSettings.hasAudio && soundSettings.audioUrl) {
+      preloadAudioFile(soundSettings.audioUrl);
+    }
 
     // Échappement des caractères HTML pour la sécurité
     function escapeHtml(text) {
@@ -410,62 +463,95 @@ ${theme.css || DEFAULT_THEME.css}
         .replace(/\\{game\\}/gi, escapeHtml(item.gameName || 'Steam'));
     }
 
-    // Joue le son personnalisé ou le carillon Web Audio par défaut
+    // Joue le son personnalisé via Web Audio API (0ms de latence, zéro bug de cache) ou le carillon
     function playNotificationSound() {
       if (!soundSettings.soundEnabled) return;
 
-      const vol = soundSettings.soundVolume ?? 0.8;
+      const vol = Math.min(1, Math.max(0, soundSettings.soundVolume ?? 0.8));
 
-      if (soundSettings.hasAudio && soundSettings.audioUrl) {
+      // 1. Jouer directement le buffer décodé en mémoire
+      if (soundSettings.hasAudio && customAudioBuffer) {
         try {
-          const audio = new Audio(soundSettings.audioUrl);
-          audio.volume = vol;
-          audio.play().catch(function(err) {
-            console.warn('[OBS Sound] Lecture audio personnalisée bloquée, fallback Web Audio:', err);
-            playDefaultChime();
-          });
-          return;
+          const ctx = getAudioCtx();
+          if (ctx) {
+            const source = ctx.createBufferSource();
+            source.buffer = customAudioBuffer;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            source.connect(gain);
+            gain.connect(ctx.destination);
+            source.start(0);
+            console.log('[OBS Sound] 🔊 Son personnalisé joué avec succès via Web Audio !');
+            return;
+          }
         } catch (e) {
-          console.warn('[OBS Sound] Erreur initialisation audio:', e);
+          console.warn('[OBS Sound] Erreur lecture buffer Web Audio:', e);
         }
       }
 
+      // 2. Si le buffer n'était pas encore préchargé : tentative de chargement d'urgence
+      if (soundSettings.hasAudio && soundSettings.audioUrl) {
+        try {
+          const ctx = getAudioCtx();
+          if (ctx) {
+            fetch(soundSettings.audioUrl + '&_now=' + Date.now())
+              .then(function(r) { return r.arrayBuffer(); })
+              .then(function(buf) { return ctx.decodeAudioData(buf); })
+              .then(function(decoded) {
+                customAudioBuffer = decoded;
+                const source = ctx.createBufferSource();
+                source.buffer = decoded;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(vol, ctx.currentTime);
+                source.connect(gain);
+                gain.connect(ctx.destination);
+                source.start(0);
+                console.log('[OBS Sound] 🔊 Son personnalisé joué à la volée !');
+              })
+              .catch(function() {
+                playDefaultChime();
+              });
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 3. Repli au carillon par défaut
       playDefaultChime();
     }
 
-    // Carillon Web Audio par défaut
+    // Carillon Web Audio par défaut (harmonisé et bien audible)
     function playDefaultChime() {
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        if (ctx.state === 'suspended') {
-          ctx.resume().catch(function() {});
-        }
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+
         const now = ctx.currentTime;
-        const vol = soundSettings.soundVolume ?? 0.8;
+        const vol = Math.min(1, Math.max(0, soundSettings.soundVolume ?? 0.8)) * 0.35;
 
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
-        osc1.type = 'sine';
+        osc1.type = 'triangle';
         osc1.frequency.setValueAtTime(587.33, now); // D5
-        gain1.gain.setValueAtTime(0.08 * vol, now);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        gain1.gain.setValueAtTime(vol * 0.9, now);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
         osc1.connect(gain1);
         gain1.connect(ctx.destination);
         osc1.start(now);
-        osc1.stop(now + 0.5);
+        osc1.stop(now + 0.46);
 
         const osc2 = ctx.createOscillator();
         const gain2 = ctx.createGain();
         osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(880.00, now + 0.12); // A5
-        gain2.gain.setValueAtTime(0.09 * vol, now + 0.12);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+        osc2.frequency.setValueAtTime(880.00, now + 0.1); // A5
+        gain2.gain.setValueAtTime(vol * 1.0, now + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
-        osc2.start(now + 0.12);
-        osc2.stop(now + 0.75);
+        osc2.start(now + 0.1);
+        osc2.stop(now + 0.76);
       } catch (e) {}
     }
 
@@ -501,7 +587,7 @@ ${theme.css || DEFAULT_THEME.css}
             const payload = JSON.parse(event.data);
 
             if (payload.type === 'CUSTOMIZATION_UPDATED' && payload.data) {
-              console.log('[OBS Overlay] 🎨 Mise à jour du thème reçue');
+              console.log('[OBS Overlay] 🎨 Mise à jour du thème reçue :', payload.data);
               if (payload.data.html && payload.data.html.trim()) {
                 currentHtmlTemplate = payload.data.html;
               }
@@ -514,6 +600,13 @@ ${theme.css || DEFAULT_THEME.css}
                 soundEnabled: payload.data.soundEnabled,
                 soundVolume: payload.data.soundVolume
               };
+
+              // Rechargement immédiat du nouveau son en mémoire dans OBS !
+              if (soundSettings.hasAudio && soundSettings.audioUrl) {
+                preloadAudioFile(soundSettings.audioUrl);
+              } else {
+                customAudioBuffer = null;
+              }
             } else if (payload.type === 'ACHIEVEMENT_UNLOCKED' && payload.data) {
               console.log('[OBS Overlay] 🏆 Succès reçu :', payload.data.displayName);
               displayAchievement(payload.data);
