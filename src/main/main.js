@@ -19,7 +19,7 @@ function createWindow() {
     title: 'Steam Custom Achievements',
     backgroundColor: '#0e141b',
     autoHideMenuBar: true,
-    show: false,
+    show: true,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -27,9 +27,9 @@ function createWindow() {
     }
   })
 
-  // Afficher la fenêtre uniquement quand le rendu est prêt pour éviter l'effet d'écran blanc
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  // Log en cas d'erreur de chargement de l'URL
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron] Échec chargement URL (${errorCode}): ${errorDescription} - ${validatedURL}`)
   })
 
   // Ouvrir les liens externes (_blank, profils Steam, etc.) dans le navigateur par défaut de l'OS
@@ -41,11 +41,18 @@ function createWindow() {
   })
 
   // Chargement en mode dev (serveur Vite) ou prod (bundle HTML)
-  if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+  const isDev = !app.isPackaged
+  const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:3000'
+
+  if (isDev) {
+    console.log('[Electron] Chargement URL de développement:', rendererUrl)
+    mainWindow.loadURL(rendererUrl)
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
+
+  mainWindow.show()
+  mainWindow.focus()
 
   mainWindow.on('closed', () => {
     mainWindow = null
