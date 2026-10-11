@@ -98,7 +98,7 @@
           <div class="apikey-portal-box">
             <div class="portal-info">
               <div class="portal-badge">Étape 1</div>
-              <p>Générez gratuitement votre clé sur le portail officiel de Steam :</p>
+              <p>Générez gratuitement votre clé sur le portail officiel de Steam (Steam vous demandera un nom de domaine : soyez créatif dans votre nom, mais mettez quelque chose que vous assimilerez facilement, par exemple <code>mon-overlay-stream</code> ou votre pseudo) :</p>
             </div>
             <button class="btn-open-steam-portal" @click="openSteamApiKeyPortal">
               <span>Récupérer ma clé sur steamcommunity.com</span>
