@@ -37,5 +37,31 @@ contextBridge.exposeInMainWorld('steamAPI', {
     return () => {
       ipcRenderer.removeListener('steam:auth-status-changed', handler)
     }
-  }
+  },
+
+  /**
+   * Écoute les événements de déblocage de succès en temps réel
+   * @param {Function} callback - Fonction appelée avec les métadonnées du succès
+   * @returns {Function} Fonction de désinscription
+   */
+  onAchievementUnlocked: (callback) => {
+    const handler = (_event, achievement) => callback(achievement)
+    ipcRenderer.on('steam:achievement-unlocked', handler)
+    return () => {
+      ipcRenderer.removeListener('steam:achievement-unlocked', handler)
+    }
+  },
+
+  /**
+   * Récupère le statut actuel du tracker de logs Steam
+   * @returns {Promise<{isTracking: boolean, steamPath: string, watchedFiles: string[], hasApiKey: boolean}>}
+   */
+  getTrackerStatus: () => ipcRenderer.invoke('steam:get-tracker-status'),
+
+  /**
+   * Déclenche une simulation de succès pour tester le fonctionnement et l'affichage
+   * @param {{appId?: string, achievementCode?: string}} params
+   * @returns {Promise<{success: boolean}>}
+   */
+  simulateAchievement: (params) => ipcRenderer.invoke('steam:simulate-achievement', params)
 })
