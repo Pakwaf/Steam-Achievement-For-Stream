@@ -4,16 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { steamAuth } from './steamAuth.js'
 
-import fs from 'node:fs'
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let mainWindow = null
 
 function createWindow() {
-  const preloadPath = fs.existsSync(path.join(__dirname, '../preload/index.mjs'))
-    ? path.join(__dirname, '../preload/index.mjs')
-    : path.join(__dirname, '../preload/index.js')
+  const preloadPath = path.join(__dirname, '../preload/index.js')
 
   mainWindow = new BrowserWindow({
     width: 1050,
@@ -26,7 +22,6 @@ function createWindow() {
     show: false,
     webPreferences: {
       preload: preloadPath,
-      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }

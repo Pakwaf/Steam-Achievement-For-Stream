@@ -19,12 +19,19 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/preload/preload.js')
+        },
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].js'
         }
       }
     }
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    server: {
+      port: 3000
+    },
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src/renderer/src')

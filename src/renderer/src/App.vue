@@ -35,6 +35,17 @@
             Affichez des notifications de succès Steam 100% personnalisables (HTML/CSS/JS) directement sur votre écran ou via une source navigateur OBS.
           </p>
 
+          <!-- Alerte si ouvert dans un navigateur standard au lieu d'Electron -->
+          <div v-if="!isElectron" class="browser-warning-banner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="warning-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <div class="warning-text">
+              <strong>Application ouverte dans un navigateur web standard.</strong>
+              <p>L'authentification Steam et les overlays nécessitent la fenêtre de l'application de bureau Electron.</p>
+            </div>
+          </div>
+
           <!-- Message d'erreur éventuel -->
           <div v-if="errorMessage" class="error-banner">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="error-icon">
@@ -177,9 +188,11 @@ const currentUser = ref(null)
 const isLoading = ref(false)
 const errorMessage = ref(null)
 const copied = ref(false)
+const isElectron = ref(typeof window !== 'undefined' && !!window.steamAPI)
 
 // Initialisation au montage du composant
 onMounted(async () => {
+  isElectron.value = typeof window !== 'undefined' && !!window.steamAPI
   if (window.steamAPI) {
     try {
       const user = await window.steamAPI.getCurrentUser()
@@ -205,7 +218,7 @@ async function handleLogin() {
 
   try {
     if (!window.steamAPI) {
-      throw new Error("L'API Steam Preload n'est pas disponible.")
+      throw new Error("L'API Steam Preload n'est pas disponible dans un navigateur standard. Veuillez utiliser la fenêtre de l'application Electron.")
     }
 
     const result = await window.steamAPI.login()
@@ -493,6 +506,41 @@ function onAvatarError(e) {
   height: 18px;
   color: #66c0f4;
   flex-shrink: 0;
+}
+
+.browser-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  color: #f5a623;
+  padding: 0.9rem 1.1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.warning-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: #f5a623;
+  margin-top: 2px;
+}
+
+.warning-text strong {
+  display: block;
+  font-size: 0.9rem;
+  color: #ffc259;
+  margin-bottom: 0.25rem;
+}
+
+.warning-text p {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  margin: 0;
 }
 
 .error-banner {
