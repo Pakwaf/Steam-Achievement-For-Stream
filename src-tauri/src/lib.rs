@@ -147,6 +147,58 @@ async fn select_audio_file() -> Result<Option<String>, String> {
     Ok(file.map(|f| f.path().to_string_lossy().to_string()))
 }
 
+#[tauri::command]
+async fn get_audio_data(
+    state: State<'_, AppState>,
+    file_path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let resolved_path = match file_path.filter(|p| !p.trim().is_empty()) {
+        Some(p) => Some(p),
+        None => {
+            let cur = state.obs.current_theme.read().await;
+            cur.get("audioPath")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        }
+    };
+
+    if let Some(path_str) = resolved_path {
+        let path = std::path::PathBuf::from(&path_str);
+        if path.exists() {
+            if let Ok(bytes) = tokio::fs::read(&path).await {
+                let ext = path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("mp3")
+                    .to_lowercase();
+
+                let mime = match ext.as_str() {
+                    "wav" => "audio/wav",
+                    "ogg" => "audio/ogg",
+                    "aac" => "audio/aac",
+                    "flac" => "audio/flac",
+                    "m4a" => "audio/mp4",
+                    _ => "audio/mpeg",
+                };
+
+                use base64::Engine;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                let data_url = format!("data:{};base64,{}", mime, b64);
+
+                return Ok(serde_json::json!({
+                    "hasAudio": true,
+                    "dataUrl": data_url
+                }));
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "hasAudio": false,
+        "dataUrl": null
+    }))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let tracker = Arc::new(AchievementTracker::new());
@@ -182,6 +234,7 @@ pub fn run() {
             open_external,
             update_customization,
             select_audio_file,
+            get_audio_data,
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

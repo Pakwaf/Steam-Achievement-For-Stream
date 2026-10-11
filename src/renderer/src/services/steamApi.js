@@ -168,8 +168,13 @@ export const steamAPI = {
     }
   },
 
-  getAudioData: async () => {
-    return { hasAudio: false, dataUrl: null }
+  getAudioData: async (filePath) => {
+    try {
+      return await invoke('get_audio_data', { filePath: filePath || null })
+    } catch (err) {
+      console.warn('[steamAPI] getAudioData error:', err)
+      return { hasAudio: false, dataUrl: null }
+    }
   },
 
   getSteamApiKey: async () => {

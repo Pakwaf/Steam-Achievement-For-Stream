@@ -110,7 +110,8 @@ function getPersistentAudioElement() {
  * Convertit une chaîne Base64 en ArrayBuffer pour décodage direct en mémoire
  */
 function base64ToArrayBuffer(base64) {
-  const binaryString = window.atob(base64)
+  const clean = (base64 || '').replace(/[\s\r\n]+/g, '')
+  const binaryString = window.atob(clean)
   const len = binaryString.length
   const bytes = new Uint8Array(len)
   for (let i = 0; i < len; i++) {
@@ -183,9 +184,19 @@ export async function playAchievementSound(themeData = {}) {
   const deviceId = themeData.audioDeviceId || 'default'
 
   // Si un fichier personnalisé est configuré
-  if (themeData.audioPath && window.steamAPI?.getAudioData) {
+  let customAudioPath = themeData.audioPath
+  if (customAudioPath === undefined && window.steamAPI?.getActiveTheme) {
     try {
-      const audioInfo = await window.steamAPI.getAudioData()
+      const active = await window.steamAPI.getActiveTheme()
+      customAudioPath = active?.audioPath || null
+    } catch {
+      // ignore
+    }
+  }
+
+  if (customAudioPath && window.steamAPI?.getAudioData) {
+    try {
+      const audioInfo = await window.steamAPI.getAudioData(customAudioPath)
 
       if (audioInfo?.hasAudio && audioInfo.dataUrl) {
         // --- ÉTAPE 1 : Décodage Web Audio API (haute fidélité, zéro latence, immunisé au GC) ---
@@ -246,7 +257,20 @@ export async function playAchievementSound(themeData = {}) {
             return true
           }
         } catch (html5Err) {
-          console.warn('[SoundPlayer] Échec HTML5 Audio:', html5Err.message)
+          console.warn('[SoundPlayer] Échec HTML5 Audio, essai OBS stream fallback:', html5Err.message)
+        }
+
+        // --- ÉTAPE 3 : Streaming HTTP local via le serveur OBS intégré ---
+        try {
+          const fallbackAudio = new Audio('http://127.0.0.1:8080/audio/custom?_t=' + Date.now())
+          fallbackAudio.volume = Math.min(1, Math.max(0, volume))
+          if (deviceId && deviceId !== 'default' && typeof fallbackAudio.setSinkId === 'function') {
+            await fallbackAudio.setSinkId(deviceId).catch(() => {})
+          }
+          await fallbackAudio.play()
+          return true
+        } catch (obsStreamErr) {
+          console.warn('[SoundPlayer] Échec OBS stream fallback:', obsStreamErr.message)
         }
       }
     } catch (err) {

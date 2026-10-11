@@ -204,6 +204,10 @@ class ThemeStorageService {
           const parsed = JSON.parse(content)
           if (parsed && Array.isArray(parsed.themes) && parsed.themes.length > 0) {
             this.cachedLibrary = parsed
+            const active = this.getActiveThemeSync()
+            if (active && this.isTauriAvailable()) {
+              invoke('update_customization', { theme: active }).catch(() => {})
+            }
             return this.cachedLibrary
           }
         }
