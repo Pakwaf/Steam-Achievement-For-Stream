@@ -164,7 +164,7 @@ function escapeHtml(text) {
   return text.toString().replace(/[&<>"']/g, (m) => map[m])
 }
 
-function playNotificationSound() {
+async function playNotificationSound() {
   if (!currentTheme.value.soundEnabled) return
 
   const volume = currentTheme.value.soundVolume ?? 0.8
@@ -173,19 +173,21 @@ function playNotificationSound() {
   try {
     const audio = new Audio(audioUrl)
     audio.volume = volume
-    audio.play().catch(() => {
-      playDefaultChime(volume)
-    })
+    audio.onerror = () => { playDefaultChime(volume) }
+    await audio.play()
   } catch {
-    playDefaultChime(volume)
+    await playDefaultChime(volume)
   }
 }
 
-function playDefaultChime(vol = 0.8) {
+async function playDefaultChime(vol = 0.8) {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext
     if (!AudioCtx) return
     const ctx = new AudioCtx()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
     const now = ctx.currentTime
 
     const osc1 = ctx.createOscillator()

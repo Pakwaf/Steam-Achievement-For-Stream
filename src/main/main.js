@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, shell, screen, dialog } from 'electron'
@@ -6,6 +7,9 @@ import { steamAuth } from './steamAuth.js'
 import { achievementTracker } from './achievementTracker.js'
 import { obsServer } from './obsServer.js'
 import { customizationService } from './customizationService.js'
+
+// Autorise la lecture audio programmée sans interaction utilisateur préalable dans Electron
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -213,7 +217,34 @@ function registerIpcHandlers() {
     return { success: false, canceled: true }
   })
 
-  // 12. Diffusion d'un faux succès de test dans tout le pipeline (Desktop + OBS + Logs)
+  // 12. Récupération directe des données audio personnalisées sous forme de Data URL Base64
+  ipcMain.handle('customization:get-audio-data', () => {
+    const theme = customizationService.getTheme()
+    if (theme.audioPath && fs.existsSync(theme.audioPath)) {
+      try {
+        const buffer = fs.readFileSync(theme.audioPath)
+        const ext = path.extname(theme.audioPath).toLowerCase().replace('.', '')
+        const mimeMap = {
+          mp3: 'audio/mpeg',
+          wav: 'audio/wav',
+          ogg: 'audio/ogg',
+          aac: 'audio/aac',
+          flac: 'audio/flac',
+          m4a: 'audio/mp4'
+        }
+        const mimeType = mimeMap[ext] || 'audio/mpeg'
+        return {
+          hasAudio: true,
+          dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`
+        }
+      } catch (err) {
+        console.warn('[Main] Impossible de charger le fichier audio en Base64:', err.message)
+      }
+    }
+    return { hasAudio: false, dataUrl: null }
+  })
+
+  // 13. Diffusion d'un faux succès de test dans tout le pipeline (Desktop + OBS + Logs)
   ipcMain.handle('steam:broadcast-test-achievement', (_event, customData) => {
     const achievementData = {
       appId: customData?.appId || '999999',

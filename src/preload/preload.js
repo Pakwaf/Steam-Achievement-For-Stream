@@ -127,7 +127,13 @@ contextBridge.exposeInMainWorld('steamAPI', {
    * @param {Object} achievementData
    * @returns {Promise<{success: boolean, achievement: Object}>}
    */
-  broadcastTestAchievement: (achievementData) => ipcRenderer.invoke('steam:broadcast-test-achievement', achievementData)
+  broadcastTestAchievement: (achievementData) => ipcRenderer.invoke('steam:broadcast-test-achievement', achievementData),
+
+  /**
+   * Récupère les données audio du fichier personnalisé sous forme de Data URL (base64)
+   * @returns {Promise<{hasAudio: boolean, dataUrl: string|null}>}
+   */
+  getAudioData: () => ipcRenderer.invoke('customization:get-audio-data')
 })
 
 

@@ -322,38 +322,64 @@ function removeAudioFile() {
 }
 
 // Joue un test du son sélectionné
-function playTestSound() {
+async function playTestSound() {
   if (!theme.value.soundEnabled || isPlayingSound.value) return
   isPlayingSound.value = true
 
   const volume = theme.value.soundVolume ?? 0.8
 
   if (theme.value.audioPath) {
+    // 1. Essayer d'abord la récupération directe en Data URL Base64 (100% fiable en Electron)
+    if (window.steamAPI?.getAudioData) {
+      try {
+        const audioInfo = await window.steamAPI.getAudioData()
+        if (audioInfo?.hasAudio && audioInfo.dataUrl) {
+          const audio = new Audio(audioInfo.dataUrl)
+          audio.volume = volume
+          audio.onended = () => { isPlayingSound.value = false }
+          audio.onerror = () => {
+            playDefaultChime(volume)
+            isPlayingSound.value = false
+          }
+          await audio.play()
+          return
+        }
+      } catch (err) {
+        console.warn('[CustomizationEditor] Échec lecture audio locale Base64:', err)
+      }
+    }
+
+    // 2. Fallback via le serveur HTTP local
     try {
       const audio = new Audio(`http://127.0.0.1:8080/audio/custom?t=${Date.now()}`)
       audio.volume = volume
       audio.onended = () => { isPlayingSound.value = false }
-      audio.play().catch(() => {
+      audio.onerror = () => {
         playDefaultChime(volume)
         isPlayingSound.value = false
-      })
+      }
+      await audio.play()
       return
     } catch {
-      playDefaultChime(volume)
+      await playDefaultChime(volume)
       isPlayingSound.value = false
       return
     }
   }
 
-  playDefaultChime(volume)
+  // Si aucun fichier personnalisé ou fallback
+  await playDefaultChime(volume)
   setTimeout(() => { isPlayingSound.value = false }, 800)
 }
 
-function playDefaultChime(vol = 0.8) {
+async function playDefaultChime(vol = 0.8) {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext
     if (!AudioCtx) return
     const ctx = new AudioCtx()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
     const now = ctx.currentTime
 
     const osc1 = ctx.createOscillator()
@@ -377,7 +403,9 @@ function playDefaultChime(vol = 0.8) {
     gain2.connect(ctx.destination)
     osc2.start(now + 0.12)
     osc2.stop(now + 0.75)
-  } catch {}
+  } catch (err) {
+    console.warn('[CustomizationEditor] Erreur Web Audio:', err)
+  }
 }
 
 // Sauvegarde et diffusion en direct du thème

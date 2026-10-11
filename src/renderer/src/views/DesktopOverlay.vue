@@ -121,30 +121,55 @@ function escapeHtml(text) {
   return text.toString().replace(/[&<>"']/g, (m) => map[m])
 }
 
-// Joue le son personnalisé via l'endpoint local ou le carillon Web Audio
-function playNotificationSound() {
+// Joue le son personnalisé via Base64 ou l'endpoint local ou le carillon Web Audio
+async function playNotificationSound() {
   if (!currentTheme.value.soundEnabled) return
 
   const volume = currentTheme.value.soundVolume ?? 0.8
-  const audioUrl = `http://127.0.0.1:8080/audio/custom?t=${Date.now()}`
 
-  try {
-    const audio = new Audio(audioUrl)
-    audio.volume = volume
-    audio.play().catch(() => {
-      // Si pas de fichier customisé (404), fallback sur carillon Web Audio
-      playDefaultChime(volume)
-    })
-  } catch {
-    playDefaultChime(volume)
+  // 1. Essayer d'abord la récupération directe en Data URL Base64
+  if (currentTheme.value.audioPath && window.steamAPI?.getAudioData) {
+    try {
+      const audioInfo = await window.steamAPI.getAudioData()
+      if (audioInfo?.hasAudio && audioInfo.dataUrl) {
+        const audio = new Audio(audioInfo.dataUrl)
+        audio.volume = volume
+        audio.onerror = () => { playDefaultChime(volume) }
+        await audio.play()
+        return
+      }
+    } catch (err) {
+      console.warn('[DesktopOverlay] Échec lecture audio Base64:', err)
+    }
   }
+
+  // 2. Fallback endpoint HTTP local
+  if (currentTheme.value.audioPath) {
+    try {
+      const audioUrl = `http://127.0.0.1:8080/audio/custom?t=${Date.now()}`
+      const audio = new Audio(audioUrl)
+      audio.volume = volume
+      audio.onerror = () => { playDefaultChime(volume) }
+      await audio.play()
+      return
+    } catch {
+      await playDefaultChime(volume)
+      return
+    }
+  }
+
+  // 3. Fallback carillon synthétisé Web Audio
+  await playDefaultChime(volume)
 }
 
-function playDefaultChime(vol = 0.8) {
+async function playDefaultChime(vol = 0.8) {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext
     if (!AudioCtx) return
     const ctx = new AudioCtx()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
     const now = ctx.currentTime
 
     const osc1 = ctx.createOscillator()
