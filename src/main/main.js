@@ -1,0 +1,116 @@
+import 'dotenv/config'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { steamAuth } from './steamAuth.js'
+
+import fs from 'node:fs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+let mainWindow = null
+
+function createWindow() {
+  const preloadPath = fs.existsSync(path.join(__dirname, '../preload/index.mjs'))
+    ? path.join(__dirname, '../preload/index.mjs')
+    : path.join(__dirname, '../preload/index.js')
+
+  mainWindow = new BrowserWindow({
+    width: 1050,
+    height: 720,
+    minWidth: 850,
+    minHeight: 600,
+    title: 'Steam Custom Achievements',
+    backgroundColor: '#0e141b',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      preload: preloadPath,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+
+  // Afficher la fenêtre uniquement quand le rendu est prêt pour éviter l'effet d'écran blanc
+  mainWindow.on('ready-to-show', () => {
+    mainWindow.show()
+  })
+
+  // Ouvrir les liens externes (_blank, profils Steam, etc.) dans le navigateur par défaut de l'OS
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  // Chargement en mode dev (serveur Vite) ou prod (bundle HTML)
+  if (process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+}
+
+// Enregistrement des écouteurs IPC pour l'authentification Steam
+function registerIpcHandlers() {
+  // 1. Déclencher le flux d'authentification Steam OpenID
+  ipcMain.handle('steam:login', async () => {
+    try {
+      const user = await steamAuth.authenticate(mainWindow)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('steam:auth-status-changed', user)
+      }
+      return { success: true, user }
+    } catch (error) {
+      console.error('Erreur de connexion Steam:', error.message)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // 2. Récupérer l'utilisateur actuellement connecté
+  ipcMain.handle('steam:get-current-user', () => {
+    return steamAuth.getCurrentUser()
+  })
+
+  // 3. Déconnexion
+  ipcMain.handle('steam:logout', () => {
+    const result = steamAuth.logout()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('steam:auth-status-changed', null)
+    }
+    return result
+  })
+
+  // 4. Ouvrir une URL externe (ex: profil Steam)
+  ipcMain.handle('app:open-external', (_event, url) => {
+    if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+      shell.openExternal(url)
+      return true
+    }
+    return false
+  })
+}
+
+// Cycle de vie de l'application Electron
+app.whenReady().then(() => {
+  registerIpcHandlers()
+  createWindow()
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})

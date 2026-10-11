@@ -1,0 +1,56 @@
+:root {
+  --bg-primary: #0b0e14;
+  --bg-secondary: #121822;
+  --bg-card: rgba(22, 32, 47, 0.7);
+  --bg-card-hover: rgba(27, 40, 56, 0.85);
+  --border-color: rgba(102, 192, 244, 0.15);
+  --border-color-active: rgba(102, 192, 244, 0.4);
+  
+  --steam-blue: #66c0f4;
+  --steam-blue-dark: #1999e3;
+  --steam-accent: #00adee;
+  --steam-text-main: #e6edf3;
+  --steam-text-muted: #8b9bb4;
+  --steam-success: #5c7e10;
+  --steam-online: #57cbde;
+  --steam-in-game: #a1cd44;
+  
+  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-card: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
+  --glow-blue: 0 0 25px rgba(102, 192, 244, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(30, 60, 90, 0.25) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(20, 100, 150, 0.15) 0%, transparent 45%);
+  color: var(--steam-text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: #1b2838;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a475e;
+}
