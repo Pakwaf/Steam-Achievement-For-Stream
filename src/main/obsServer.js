@@ -440,7 +440,7 @@ ${theme.css || DEFAULT_THEME.css}
         customAudioBuffer = await ctx.decodeAudioData(arrayBuf);
         console.log('[OBS Sound] ✔ Nouveau fichier audio personnalisé décodé et prêt en mémoire !');
       } catch (err) {
-        console.warn('[OBS Sound] Impossible de charger l\'audio personnalisé, repli prévu:', err.message);
+        console.warn("[OBS Sound] Impossible de charger l'audio personnalise, repli prevu:", err.message);
         customAudioBuffer = null;
       }
     }
