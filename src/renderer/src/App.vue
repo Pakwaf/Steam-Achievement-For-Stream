@@ -223,19 +223,19 @@
               <button
                 class="btn-sim"
                 :disabled="isSimulating"
-                @click="simulateAchievement('1794680', 'ACH_DISCOVER_HYPER_ROSETTA')"
+                @click="simulateAchievement('1794680', 'ReachLV5')"
               >
                 <span class="sim-game-badge">Vampire Survivors</span>
-                <span>Hyper Rosetta</span>
+                <span>Ailes (LV5)</span>
               </button>
 
               <button
                 class="btn-sim"
                 :disabled="isSimulating"
-                @click="simulateAchievement('550', 'ACH_SURVIVE_CAMPAIGN_NEW')"
+                @click="simulateAchievement('550', 'ACH_FINISH_CAMPAIGN_MELEE_ONLY')"
               >
                 <span class="sim-game-badge">Left 4 Dead 2</span>
-                <span>Survivant</span>
+                <span>Guerre frontale</span>
               </button>
             </div>
           </div>

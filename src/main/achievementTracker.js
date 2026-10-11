@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execSync } from 'node:child_process'
@@ -14,6 +15,7 @@ export class AchievementTracker {
     this.remainders = new Map() // chemin -> reste de ligne non terminée
     this.watchers = [] // instances de fs.watchFile
     this.schemaCache = new Map() // appId -> schéma complet du jeu
+    this.gameNameCache = new Map() // appId -> nom du jeu (Store API fallback)
     this.onUnlockCallback = null
   }
 
@@ -310,6 +312,42 @@ export class AchievementTracker {
   }
 
   /**
+   * Résout le nom du jeu via le schéma ou l'API Steam Store en fallback
+   * (Nécessaire pour les jeux comme Left 4 Dead 2 ou Portal 2 où gameName est vide dans GetSchemaForGame)
+   * @param {string} appId 
+   * @param {string} schemaGameName 
+   * @returns {Promise<string>}
+   */
+  async resolveGameName(appId, schemaGameName) {
+    if (schemaGameName && schemaGameName.trim()) {
+      return schemaGameName.trim()
+    }
+
+    if (this.gameNameCache.has(appId)) {
+      return this.gameNameCache.get(appId)
+    }
+
+    try {
+      const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}`)
+      if (res.ok) {
+        const data = await res.json()
+        const storeName = data?.[appId]?.data?.name
+        if (storeName && storeName.trim()) {
+          const cleanName = storeName.trim()
+          this.gameNameCache.set(appId, cleanName)
+          return cleanName
+        }
+      }
+    } catch (err) {
+      console.warn(`[AchievementTracker] Impossible de résoudre le nom du jeu pour AppID ${appId}:`, err)
+    }
+
+    const fallback = `Jeu #${appId}`
+    this.gameNameCache.set(appId, fallback)
+    return fallback
+  }
+
+  /**
    * Interroge l'API Steam ISteamUserStats/GetSchemaForGame avec système de cache
    * @param {string} appId 
    * @param {string} achievementApiName 
@@ -338,13 +376,26 @@ export class AchievementTracker {
       }
     }
 
-    const gameName = schema?.gameName || `Jeu #${appId}`
+    // Résolution fiable du nom du jeu (gère les noms vides de Valve comme L4D2)
+    const gameName = await this.resolveGameName(appId, schema?.gameName)
     const achievementsList = schema?.availableGameStats?.achievements || []
 
-    // 2. Recherche du succès correspondant dans le schéma
-    const target = achievementsList.find(
-      (a) => a.name.toLowerCase() === achievementApiName.toLowerCase()
-    )
+    // 2. Recherche robuste du succès correspondant dans le schéma
+    const cleanCode = achievementApiName.replace(/^['"]|['"]$/g, '').trim().toLowerCase()
+    const strippedCode = cleanCode.replace(/[^a-z0-9]/g, '')
+
+    // Recherche A : correspondance directe insensible à la casse
+    let target = achievementsList.find((a) => a.name.toLowerCase() === cleanCode)
+
+    // Recherche B : correspondance insensible aux underscores et tirets
+    if (!target) {
+      target = achievementsList.find((a) => a.name.toLowerCase().replace(/[^a-z0-9]/g, '') === strippedCode)
+    }
+
+    // Recherche C : correspondance partielle
+    if (!target) {
+      target = achievementsList.find((a) => a.name.toLowerCase().includes(cleanCode) || cleanCode.includes(a.name.toLowerCase()))
+    }
 
     if (target) {
       return {
@@ -353,21 +404,21 @@ export class AchievementTracker {
         apiName: target.name,
         displayName: target.displayName || target.name,
         description: target.description || 'Succès débloqué !',
-        icon: target.icon || '',
+        icon: target.icon || target.icongray || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
         iconGray: target.icongray || '',
         hidden: Boolean(target.hidden),
         unlockedAt: new Date().toISOString()
       }
     }
 
-    // 3. Fallback si le succès précis n'est pas répertorié dans le schéma
+    // 3. Fallback avec icône par défaut fiable si le code n'est pas dans le schéma
     return {
       appId,
       gameName,
       apiName: achievementApiName,
       displayName: achievementApiName,
       description: 'Succès débloqué !',
-      icon: 'https://community.cloudflare.steamstatic.com/public/images/apps/' + appId + '/icon.jpg',
+      icon: 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
       iconGray: '',
       hidden: false,
       unlockedAt: new Date().toISOString()
