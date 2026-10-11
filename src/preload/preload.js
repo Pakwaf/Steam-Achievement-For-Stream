@@ -63,5 +63,11 @@ contextBridge.exposeInMainWorld('steamAPI', {
    * @param {{appId?: string, achievementCode?: string}} params
    * @returns {Promise<{success: boolean}>}
    */
-  simulateAchievement: (params) => ipcRenderer.invoke('steam:simulate-achievement', params)
+  simulateAchievement: (params) => ipcRenderer.invoke('steam:simulate-achievement', params),
+
+  /**
+   * Récupère le statut du serveur OBS local (port, clients connectés, URL)
+   * @returns {Promise<{isRunning: boolean, port: number, obsUrl: string, connectedClients: number}>}
+   */
+  getObsStatus: () => ipcRenderer.invoke('obs:get-server-status')
 })

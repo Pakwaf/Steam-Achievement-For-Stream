@@ -54,3 +54,17 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #2a475e;
 }
+
+/* ========================================================
+   MODES TRANSPARENTS (OVERLAY DESKTOP & SOURCE OBS)
+   ======================================================== */
+html.transparent-view,
+body.transparent-view,
+body.transparent-view #app {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  overflow: hidden !important;
+  min-height: 100vh;
+}
+
