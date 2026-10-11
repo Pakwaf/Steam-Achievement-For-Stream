@@ -1,10 +1,11 @@
 import 'dotenv/config'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, ipcMain, shell, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, screen, dialog } from 'electron'
 import { steamAuth } from './steamAuth.js'
 import { achievementTracker } from './achievementTracker.js'
 import { obsServer } from './obsServer.js'
+import { customizationService } from './customizationService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -169,10 +170,83 @@ function registerIpcHandlers() {
   ipcMain.handle('obs:get-server-status', () => {
     return obsServer.getStatus()
   })
+
+  // 8. Récupération du thème de personnalisation (HTML, CSS, Audio)
+  ipcMain.handle('customization:get', () => {
+    return customizationService.getTheme()
+  })
+
+  // 9. Sauvegarde du thème de personnalisation
+  ipcMain.handle('customization:save', (_event, themeData) => {
+    const saved = customizationService.save(themeData)
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('customization:updated', saved)
+    }
+    obsServer.broadcastCustomization(saved)
+    return { success: true, theme: saved }
+  })
+
+  // 10. Réinitialisation au thème par défaut
+  ipcMain.handle('customization:reset', () => {
+    const defaultTheme = customizationService.reset()
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('customization:updated', defaultTheme)
+    }
+    obsServer.broadcastCustomization(defaultTheme)
+    return { success: true, theme: defaultTheme }
+  })
+
+  // 11. Boîte de dialogue pour sélectionner un fichier audio local
+  ipcMain.handle('customization:select-audio', async () => {
+    const win = mainWindow || overlayWindow
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Sélectionner un fichier audio pour la notification',
+      filters: [
+        { name: 'Fichiers Audio', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'] }
+      ],
+      properties: ['openFile']
+    })
+
+    if (!result.canceled && result.filePaths?.length > 0) {
+      return { success: true, filePath: result.filePaths[0] }
+    }
+    return { success: false, canceled: true }
+  })
+
+  // 12. Diffusion d'un faux succès de test dans tout le pipeline (Desktop + OBS + Logs)
+  ipcMain.handle('steam:broadcast-test-achievement', (_event, customData) => {
+    const achievementData = {
+      appId: customData?.appId || '999999',
+      achievementCode: customData?.achievementCode || 'TEST_NOTIFICATION',
+      displayName: customData?.displayName || 'Ceci est un test',
+      description: customData?.description || 'Bravo, tout fonctionne !',
+      icon: customData?.icon || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
+      gameName: customData?.gameName || 'Test Game',
+      unlockedAt: new Date().toISOString()
+    }
+
+    console.log('[Main] 🧪 Diffusion d\'un succès factice de test :', achievementData.displayName)
+
+    // A) Envoi prioritaire à l'overlay transparent en jeu
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('steam:achievement-unlocked', achievementData)
+    }
+
+    // B) Envoi au dashboard principal pour affichage dans l'historique
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('steam:achievement-unlocked', achievementData)
+    }
+
+    // C) Diffusion WebSocket à toutes les sources OBS
+    obsServer.broadcastAchievement(achievementData)
+
+    return { success: true, achievement: achievementData }
+  })
 }
 
 // Cycle de vie de l'application Electron
 app.whenReady().then(() => {
+  customizationService.init()
   registerIpcHandlers()
 
   // 1. Démarrer les fenêtres

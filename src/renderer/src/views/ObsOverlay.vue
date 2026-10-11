@@ -3,39 +3,58 @@
     <!-- Indicateur d'état de connexion OBS (visible brièvement lors du setup) -->
     <div v-if="showDebugBanner" class="obs-debug-pill" :class="{ connected: isConnected }">
       <span class="dot"></span>
-      <span>{{ isConnected ? 'OBS Connecté (ws://localhost:8080)' : 'Connexion au serveur OBS...' }}</span>
+      <span>{{ isConnected ? 'OBS Connecté (ws://127.0.0.1:8080)' : 'Connexion au serveur OBS...' }}</span>
     </div>
 
-    <!-- Bannière de succès animée (5 secondes) -->
-    <AchievementBanner
-      :achievement="currentAchievement"
-      :duration="5000"
-      position="bottom-right"
-      @dismiss="onDismiss"
-    />
+    <!-- Style CSS utilisateur injecté dynamiquement -->
+    <component :is="'style'">
+      {{ currentTheme.css || '' }}
+    </component>
+
+    <!-- Rendu HTML dynamique du succès avec placeholders remplacés -->
+    <div
+      v-if="isDisplaying && renderedHtml"
+      class="dynamic-achievement-wrapper"
+      :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
+      v-html="renderedHtml"
+    ></div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import AchievementBanner from '../components/AchievementBanner.vue'
 
-const currentAchievement = ref(null)
+const currentTheme = ref({
+  html: '',
+  css: '',
+  hasAudio: false,
+  audioUrl: '/audio/custom',
+  soundEnabled: true,
+  soundVolume: 0.8
+})
+
+const isDisplaying = ref(false)
+const isEntering = ref(false)
+const isLeaving = ref(false)
+const renderedHtml = ref('')
 const isConnected = ref(false)
 const showDebugBanner = ref(true)
 
 let socket = null
 let reconnectTimer = null
 let debugHideTimer = null
+let dismissTimer = null
+let leaveTimer = null
+let reconnectAttempts = 0
+
+const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
 onMounted(() => {
-  // S'assurer que le body est 100% transparent pour la source OBS Browser
   document.body.classList.add('transparent-view')
   document.documentElement.classList.add('transparent-view')
 
   connectWebSocket()
 
-  // Masquer discrètement la pilule de débogage après 4 secondes pour garder la source 100% propre
   debugHideTimer = setTimeout(() => {
     showDebugBanner.value = false
   }, 4000)
@@ -46,48 +65,50 @@ function connectWebSocket() {
     return
   }
 
-  // Déterminer l'URL du WebSocket (défaut ws://localhost:8080)
-  const host = window.location.hostname || 'localhost'
+  // Alterne entre 127.0.0.1 et localhost pour contourner les soucis DNS Windows
+  let host = '127.0.0.1'
+  if (reconnectAttempts % 2 === 1) {
+    host = 'localhost'
+  }
   const wsUrl = `ws://${host}:8080`
-
-  console.log(`[ObsOverlay] Connexion WebSocket vers ${wsUrl}...`)
 
   try {
     socket = new WebSocket(wsUrl)
 
     socket.onopen = () => {
-      console.log('[ObsOverlay] ✔ Connecté au serveur OBS')
+      console.log('[ObsOverlay] ✔ Connecté au serveur OBS via', wsUrl)
       isConnected.value = true
+      reconnectAttempts = 0
+      socket.send(JSON.stringify({ type: 'OBS_CLIENT_READY' }))
     }
 
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data)
-        console.log('[ObsOverlay] Message WebSocket reçu:', payload.type)
 
-        if (payload.type === 'ACHIEVEMENT_UNLOCKED' && payload.data) {
-          currentAchievement.value = payload.data
-        } else if (payload.type === 'CONNECTED') {
-          console.log('[ObsOverlay]', payload.message)
+        if (payload.type === 'CUSTOMIZATION_UPDATED' && payload.data) {
+          console.log('[ObsOverlay] 🎨 Mise à jour du thème reçue')
+          currentTheme.value = payload.data
+        } else if (payload.type === 'ACHIEVEMENT_UNLOCKED' && payload.data) {
+          console.log('[ObsOverlay] 🏆 Succès reçu :', payload.data.displayName)
+          triggerAchievement(payload.data)
         }
       } catch (err) {
-        console.error('[ObsOverlay] Erreur analyse payload WebSocket:', err)
+        console.error('[ObsOverlay] Erreur payload:', err)
       }
     }
 
     socket.onclose = () => {
-      console.warn('[ObsOverlay] Déconnecté du serveur OBS. Tentative de reconnexion dans 3s...')
       isConnected.value = false
+      reconnectAttempts++
       scheduleReconnect()
     }
 
-    socket.onerror = (err) => {
-      console.error('[ObsOverlay] Erreur WebSocket:', err)
+    socket.onerror = () => {
       isConnected.value = false
       if (socket) socket.close()
     }
   } catch (err) {
-    console.error('[ObsOverlay] Impossible de créer la connexion WebSocket:', err)
     scheduleReconnect()
   }
 }
@@ -97,19 +118,107 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
     connectWebSocket()
-  }, 3000)
+  }, 1500)
 }
 
-function onDismiss() {
-  currentAchievement.value = null
+function triggerAchievement(data) {
+  if (dismissTimer) clearTimeout(dismissTimer)
+  if (leaveTimer) clearTimeout(leaveTimer)
+
+  playNotificationSound()
+
+  renderedHtml.value = replacePlaceholders(currentTheme.value.html, data)
+  isDisplaying.value = true
+  isEntering.value = true
+  isLeaving.value = false
+
+  dismissTimer = setTimeout(() => {
+    isEntering.value = false
+    isLeaving.value = true
+
+    leaveTimer = setTimeout(() => {
+      isDisplaying.value = false
+      isLeaving.value = false
+      renderedHtml.value = ''
+    }, 400)
+  }, 5000)
+}
+
+function replacePlaceholders(template, data) {
+  if (!template) return ''
+  const title = escapeHtml(data.displayName || 'Succès Débloqué')
+  const description = escapeHtml(data.description || '')
+  const icon = data.icon || fallbackIcon
+  const game = escapeHtml(data.gameName || 'Steam')
+
+  return template
+    .replace(/\{title\}/gi, title)
+    .replace(/\{description\}/gi, description)
+    .replace(/\{icon\}/gi, icon)
+    .replace(/\{game\}/gi, game)
+}
+
+function escapeHtml(text) {
+  if (!text) return ''
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
+  return text.toString().replace(/[&<>"']/g, (m) => map[m])
+}
+
+function playNotificationSound() {
+  if (!currentTheme.value.soundEnabled) return
+
+  const volume = currentTheme.value.soundVolume ?? 0.8
+  const audioUrl = `http://127.0.0.1:8080/audio/custom?t=${Date.now()}`
+
+  try {
+    const audio = new Audio(audioUrl)
+    audio.volume = volume
+    audio.play().catch(() => {
+      playDefaultChime(volume)
+    })
+  } catch {
+    playDefaultChime(volume)
+  }
+}
+
+function playDefaultChime(vol = 0.8) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+    const now = ctx.currentTime
+
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.type = 'sine'
+    osc1.frequency.setValueAtTime(587.33, now)
+    gain1.gain.setValueAtTime(0.08 * vol, now)
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    osc1.start(now)
+    osc1.stop(now + 0.5)
+
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(880.00, now + 0.12)
+    gain2.gain.setValueAtTime(0.09 * vol, now + 0.12)
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7)
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    osc2.start(now + 0.12)
+    osc2.stop(now + 0.75)
+  } catch {}
 }
 
 onUnmounted(() => {
   document.body.classList.remove('transparent-view')
   document.documentElement.classList.remove('transparent-view')
-
   if (reconnectTimer) clearTimeout(reconnectTimer)
   if (debugHideTimer) clearTimeout(debugHideTimer)
+  if (dismissTimer) clearTimeout(dismissTimer)
+  if (leaveTimer) clearTimeout(leaveTimer)
   if (socket) {
     socket.close()
     socket = null
@@ -128,7 +237,6 @@ onUnmounted(() => {
   position: relative;
 }
 
-/* Pilule discrète de diagnostic lors de l'intégration dans OBS */
 .obs-debug-pill {
   position: absolute;
   top: 1rem;

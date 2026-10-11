@@ -42,7 +42,7 @@
         </div>
         <div class="brand-text">
           <h1>Steam Custom Achievements</h1>
-          <span class="badge-phase">Phase 3 • Double affichage (Overlay & OBS)</span>
+          <span class="badge-phase">Phase 4 • Moteur de personnalisation & Test</span>
         </div>
       </div>
       <div class="header-status-group">
@@ -240,7 +240,10 @@
           </div>
         </div>
 
-        <!-- 3. Panneau de Contrôle & Diagnostic du Tracker -->
+        <!-- 3. NOUVEAU EN PHASE 4 : Moteur de personnalisation HTML / CSS / Audio et Mode Test -->
+        <CustomizationEditor />
+
+        <!-- 4. Panneau de Contrôle & Diagnostic du Tracker -->
         <div class="tracker-card">
           <div class="tracker-card-header">
             <div class="tracker-title-box">
@@ -360,6 +363,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import CustomizationEditor from '../components/CustomizationEditor.vue'
 
 const currentUser = ref(null)
 const isLoading = ref(false)

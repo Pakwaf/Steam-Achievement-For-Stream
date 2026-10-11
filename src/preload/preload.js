@@ -82,6 +82,52 @@ contextBridge.exposeInMainWorld('steamAPI', {
     return () => {
       ipcRenderer.removeListener('obs:status-changed', handler)
     }
-  }
+  },
+
+  /**
+   * Récupère le thème de personnalisation actif (HTML, CSS, Audio)
+   * @returns {Promise<{html: string, css: string, audioPath: string|null, soundEnabled: boolean, soundVolume: number}>}
+   */
+  getCustomization: () => ipcRenderer.invoke('customization:get'),
+
+  /**
+   * Enregistre le thème de personnalisation
+   * @param {Object} theme
+   * @returns {Promise<{success: boolean, theme: Object}>}
+   */
+  saveCustomization: (theme) => ipcRenderer.invoke('customization:save', theme),
+
+  /**
+   * Réinitialise le thème de personnalisation aux valeurs par défaut
+   * @returns {Promise<{success: boolean, theme: Object}>}
+   */
+  resetCustomization: () => ipcRenderer.invoke('customization:reset'),
+
+  /**
+   * Ouvre la boîte de dialogue native pour sélectionner un fichier audio
+   * @returns {Promise<{success: boolean, filePath?: string, canceled?: boolean}>}
+   */
+  selectAudioFile: () => ipcRenderer.invoke('customization:select-audio'),
+
+  /**
+   * Écoute les mises à jour en direct du thème personnalisé
+   * @param {Function} callback
+   * @returns {Function} Fonction de désinscription
+   */
+  onCustomizationUpdated: (callback) => {
+    const handler = (_event, theme) => callback(theme)
+    ipcRenderer.on('customization:updated', handler)
+    return () => {
+      ipcRenderer.removeListener('customization:updated', handler)
+    }
+  },
+
+  /**
+   * Diffuse un faux succès de test dans tout le pipeline (Phase 4)
+   * @param {Object} achievementData
+   * @returns {Promise<{success: boolean, achievement: Object}>}
+   */
+  broadcastTestAchievement: (achievementData) => ipcRenderer.invoke('steam:broadcast-test-achievement', achievementData)
 })
+
 
