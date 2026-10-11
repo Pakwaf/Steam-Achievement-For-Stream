@@ -73,8 +73,89 @@
       </div>
 
       <!-- État 1 : Utilisateur non connecté -->
+      <!-- État 1 : Utilisateur non connecté (Configuration Clé API puis Connexion) -->
       <section v-if="!currentUser" class="auth-section">
-        <div class="auth-card">
+        <!-- ÉTAPE 1 : Configuration initiale de la Clé Steam Web API -->
+        <div v-if="authStep === 'apikey'" class="auth-card apikey-setup-card">
+          <div class="auth-steps-header">
+            <span class="step-chip active">1. Clé API Steam Web</span>
+            <span class="step-separator">➔</span>
+            <span class="step-chip">2. Connexion Steam</span>
+          </div>
+
+          <div class="auth-icon-wrapper apikey-glow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="key-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+            </svg>
+          </div>
+
+          <h2>Configuration de la clé Steam API</h2>
+          <p class="auth-description">
+            Pour récupérer automatiquement les noms, descriptions détaillées et icônes officielles de tous vos succès Steam, veuillez configurer votre clé Steam Web API.
+          </p>
+
+          <!-- Bloc d'explication et bouton direct vers le site de Steam -->
+          <div class="apikey-portal-box">
+            <div class="portal-info">
+              <div class="portal-badge">Étape 1</div>
+              <p>Générez gratuitement votre clé sur le portail officiel de Steam (entrez n'importe quel nom de domaine comme <code>localhost</code> sur la page) :</p>
+            </div>
+            <button class="btn-open-steam-portal" @click="openSteamApiKeyPortal">
+              <span>Récupérer ma clé sur steamcommunity.com</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="external-link-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Champ pour coller la clé -->
+          <div class="apikey-input-section">
+            <label class="apikey-label">
+              <span>Étape 2 : Collez votre clé API Steam (32 caractères)</span>
+            </label>
+            <div class="key-input-wrapper">
+              <input
+                v-model="steamApiKey"
+                type="text"
+                class="key-text-input"
+                placeholder="Ex : 4B8A92FD7E83C1A4B02E9104..."
+                spellcheck="false"
+              />
+              <button class="btn-paste-key" title="Coller depuis le presse-papier" @click="pasteApiKey">
+                📋 Coller
+              </button>
+            </div>
+          </div>
+
+          <div v-if="keySavedMessage" class="success-banner">
+            <span>{{ keySavedMessage }}</span>
+          </div>
+
+          <!-- Actions de navigation -->
+          <div class="apikey-actions-footer">
+            <button
+              class="btn-save-key-next"
+              :disabled="isSavingKey"
+              @click="handleSaveApiKey"
+            >
+              <span>{{ isSavingKey ? 'Enregistrement...' : 'Enregistrer et passer à la connexion ➔' }}</span>
+            </button>
+
+            <button class="btn-skip-key-step" @click="skipApiKeySetup">
+              Continuer sans clé API (Mode fallback)
+            </button>
+          </div>
+        </div>
+
+        <!-- ÉTAPE 2 : Connexion Steam OpenID -->
+        <div v-else class="auth-card">
+          <div class="auth-steps-header">
+            <button class="btn-back-step" title="Revenir pour modifier la clé API" @click="goToApiKeyStep">
+              ← Modifier la clé API Steam
+            </button>
+            <span class="step-chip active">2. Connexion Steam</span>
+          </div>
+
           <div class="auth-icon-wrapper">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shield-icon">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
@@ -307,22 +388,8 @@
                 <span class="theme-id-sub">{{ thm.id }}</span>
               </div>
 
-              <!-- Mini Rendu Visuel / Mockup de la Notification pour ce thème -->
-              <div class="card-preview-mockup">
-                <div class="mockup-frame">
-                  <div class="mockup-icon-box">
-                    <img :src="fallbackIcon" alt="Icon" class="mockup-icon" />
-                  </div>
-                  <div class="mockup-details">
-                    <div class="mockup-top-line">
-                      <span class="mockup-game">Steam Game</span>
-                      <span class="mockup-tag">DÉBLOQUÉ</span>
-                    </div>
-                    <span class="mockup-title">Succès Débloqué</span>
-                    <span class="mockup-desc">Rendu personnalisé pour ce thème</span>
-                  </div>
-                </div>
-              </div>
+              <!-- Rendu Visuel Réel (HTML & CSS du thème en direct) -->
+              <ThemeCardPreview :html="thm.html" :css="thm.css" />
 
               <!-- Actions sur la carte -->
               <div class="card-actions-toolbar">
@@ -491,6 +558,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import CustomizationEditor from '../components/CustomizationEditor.vue'
+import ThemeCardPreview from '../components/ThemeCardPreview.vue'
 import { playAchievementSound } from '../utils/soundPlayer.js'
 
 const currentUser = ref(null)
@@ -500,6 +568,12 @@ const copied = ref(false)
 const obsCopied = ref(false)
 const obsLocalhostCopied = ref(false)
 const isElectron = ref(typeof window !== 'undefined' && !!window.steamAPI)
+
+// Authentification et configuration Clé Steam API
+const authStep = ref('apikey') // 'apikey' | 'login'
+const steamApiKey = ref('')
+const isSavingKey = ref(false)
+const keySavedMessage = ref('')
 
 // État du tracker, de l'OBS et des succès
 const trackerStatus = ref(null)
@@ -524,6 +598,15 @@ onMounted(async () => {
   isElectron.value = typeof window !== 'undefined' && !!window.steamAPI
   if (window.steamAPI) {
     try {
+      // 0. Récupération de la clé Steam API existante pour diriger l'utilisateur vers la bonne étape
+      if (window.steamAPI.getSteamApiKey) {
+        const savedKey = await window.steamAPI.getSteamApiKey()
+        if (savedKey) {
+          steamApiKey.value = savedKey
+          authStep.value = 'login'
+        }
+      }
+
       // 1. Utilisateur courant
       const user = await window.steamAPI.getCurrentUser()
       if (user) currentUser.value = user
@@ -561,8 +644,11 @@ onMounted(async () => {
       })
     }
 
-    // Écoute des succès débloqués en temps réel (réels ou tests)
+    // Écoute des succès débloqués en temps réel (réels)
     window.steamAPI.onAchievementUnlocked(async (achievement) => {
+      // Les notifications de test ne doivent s'afficher que sur OBS et sur l'Écran (Desktop Overlay)
+      if (achievement?.isTest) return
+
       triggerAchievementToast(achievement)
       try {
         let theme = null
@@ -752,6 +838,54 @@ async function simulateAchievement(appId, achievementCode) {
   } finally {
     isSimulating.value = false
   }
+}
+
+// Configuration et gestion de la clé Steam API
+function openSteamApiKeyPortal() {
+  const portalUrl = 'https://steamcommunity.com/dev/apikey'
+  if (window.steamAPI?.openExternal) {
+    window.steamAPI.openExternal(portalUrl)
+  } else {
+    window.open(portalUrl, '_blank')
+  }
+}
+
+async function pasteApiKey() {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (text) {
+      steamApiKey.value = text.trim()
+    }
+  } catch (err) {
+    console.warn('[Dashboard] Impossible de lire le presse-papier:', err)
+  }
+}
+
+async function handleSaveApiKey() {
+  if (isSavingKey.value) return
+  isSavingKey.value = true
+  try {
+    if (window.steamAPI?.saveSteamApiKey) {
+      await window.steamAPI.saveSteamApiKey(steamApiKey.value.trim())
+    }
+    keySavedMessage.value = 'Clé API enregistrée avec succès ! Redirection...'
+    setTimeout(() => {
+      keySavedMessage.value = ''
+      authStep.value = 'login'
+    }, 750)
+  } catch (err) {
+    console.error('[Dashboard] Erreur enregistrement clé Steam API:', err)
+  } finally {
+    isSavingKey.value = false
+  }
+}
+
+function skipApiKeySetup() {
+  authStep.value = 'login'
+}
+
+function goToApiKeyStep() {
+  authStep.value = 'apikey'
 }
 
 // Connexion Steam
@@ -1166,6 +1300,249 @@ function onIconError(e) {
   max-width: 480px;
   text-align: center;
   box-shadow: var(--shadow-card);
+}
+
+.apikey-setup-card {
+  max-width: 580px;
+}
+
+.auth-steps-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.step-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--steam-text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.step-chip.active {
+  color: #66c0f4;
+  background: rgba(102, 192, 244, 0.15);
+  border-color: rgba(102, 192, 244, 0.4);
+}
+
+.step-separator {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.8rem;
+}
+
+.btn-back-step {
+  background: none;
+  border: none;
+  color: #66c0f4;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  transition: var(--transition-smooth);
+}
+
+.btn-back-step:hover {
+  background: rgba(102, 192, 244, 0.1);
+  text-decoration: underline;
+}
+
+.apikey-glow {
+  background: rgba(240, 195, 48, 0.1) !important;
+  border-color: rgba(240, 195, 48, 0.3) !important;
+}
+
+.key-icon {
+  width: 32px;
+  height: 32px;
+  color: #f0c330;
+}
+
+.apikey-portal-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.portal-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.86rem;
+  color: #c5d4e8;
+  line-height: 1.45;
+}
+
+.portal-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #f0c330;
+  background: rgba(240, 195, 48, 0.15);
+  border: 1px solid rgba(240, 195, 48, 0.3);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.portal-info code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #fff;
+}
+
+.btn-open-steam-portal {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: linear-gradient(135deg, rgba(102, 192, 244, 0.2) 0%, rgba(27, 40, 56, 0.6) 100%);
+  border: 1px solid rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-open-steam-portal:hover {
+  background: #66c0f4;
+  color: #0b0e14;
+  box-shadow: 0 0 16px rgba(102, 192, 244, 0.35);
+}
+
+.external-link-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.apikey-input-section {
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.apikey-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--steam-text-main);
+  margin-bottom: 0.5rem;
+}
+
+.key-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.key-text-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: #ffffff;
+  font-family: monospace;
+  font-size: 0.88rem;
+  letter-spacing: 0.05em;
+  transition: var(--transition-smooth);
+}
+
+.key-text-input:focus {
+  outline: none;
+  border-color: #f0c330;
+  box-shadow: 0 0 12px rgba(240, 195, 48, 0.3);
+}
+
+.btn-paste-key {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c5d4e8;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-smooth);
+}
+
+.btn-paste-key:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.success-banner {
+  background: rgba(161, 205, 68, 0.15);
+  border: 1px solid rgba(161, 205, 68, 0.4);
+  color: #a1cd44;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.apikey-actions-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.btn-save-key-next {
+  width: 100%;
+  padding: 0.95rem 1.25rem;
+  background: linear-gradient(135deg, #f0c330 0%, #b89118 100%);
+  color: #0b0e14;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(240, 195, 48, 0.35);
+  transition: var(--transition-smooth);
+}
+
+.btn-save-key-next:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(240, 195, 48, 0.5);
+  background: linear-gradient(135deg, #ffd34e 0%, #ca9e1a 100%);
+}
+
+.btn-save-key-next:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-skip-key-step {
+  background: transparent;
+  border: none;
+  color: var(--steam-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: var(--transition-smooth);
+}
+
+.btn-skip-key-step:hover {
+  color: #c5d4e8;
+  text-decoration: underline;
 }
 
 .auth-icon-wrapper {

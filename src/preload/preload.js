@@ -194,7 +194,20 @@ contextBridge.exposeInMainWorld('steamAPI', {
    * @param {string} [specificPath]
    * @returns {Promise<{hasAudio: boolean, dataUrl: string|null}>}
    */
-  getAudioData: (specificPath) => ipcRenderer.invoke('customization:get-audio-data', specificPath)
+  getAudioData: (specificPath) => ipcRenderer.invoke('customization:get-audio-data', specificPath),
+
+  /**
+   * Récupère la clé Steam Web API enregistrée
+   * @returns {Promise<{apiKey: string, hasKey: boolean}>}
+   */
+  getSteamApiKey: () => ipcRenderer.invoke('steam:get-api-key'),
+
+  /**
+   * Enregistre la clé Steam Web API
+   * @param {string} key
+   * @returns {Promise<{success: boolean, apiKey: string, hasKey: boolean}>}
+   */
+  saveSteamApiKey: (key) => ipcRenderer.invoke('steam:save-api-key', key)
 })
 
 

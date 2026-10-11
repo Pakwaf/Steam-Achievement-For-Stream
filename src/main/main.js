@@ -7,6 +7,7 @@ import { steamAuth } from './steamAuth.js'
 import { achievementTracker } from './achievementTracker.js'
 import { obsServer } from './obsServer.js'
 import { customizationService } from './customizationService.js'
+import { settingsService } from './settingsService.js'
 
 // Autorise la lecture audio programmée sans interaction utilisateur préalable dans Electron
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
@@ -337,7 +338,16 @@ function registerIpcHandlers() {
     return { hasAudio: false, dataUrl: null, rawBuffer: null }
   })
 
-  // 18. Diffusion d'un faux succès de test dans tout le pipeline (avec support du thème de preview)
+  // 18. Récupération et sauvegarde de la clé Steam Web API
+  ipcMain.handle('steam:get-api-key', () => {
+    return settingsService.getSteamApiKey()
+  })
+
+  ipcMain.handle('steam:save-api-key', (_event, key) => {
+    return settingsService.saveSteamApiKey(key)
+  })
+
+  // 19. Diffusion d'un faux succès de test (uniquement sur l'Overlay Écran et OBS)
   ipcMain.handle('steam:broadcast-test-achievement', (_event, customData) => {
     const achievementData = {
       appId: customData?.appId || '999999',
@@ -347,20 +357,18 @@ function registerIpcHandlers() {
       icon: customData?.icon || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
       gameName: customData?.gameName || 'Test Game',
       unlockedAt: new Date().toISOString(),
-      previewTheme: customData?.previewTheme || null
+      previewTheme: customData?.previewTheme || null,
+      isTest: true
     }
 
-    console.log('[Main] 🧪 Diffusion d\'un succès factice de test :', achievementData.displayName, customData?.previewTheme ? '(Mode Thème Preview)' : '')
+    console.log('[Main] 🧪 Diffusion d\'un succès factice de test (Desktop + OBS uniquement) :', achievementData.displayName, customData?.previewTheme ? '(Mode Thème Preview)' : '')
 
-    // A) Envoi prioritaire à l'overlay transparent en jeu
+    // A) Envoi prioritaire à l'overlay transparent en jeu (ÉCRAN)
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.webContents.send('steam:achievement-unlocked', achievementData)
     }
 
-    // B) Envoi au dashboard principal pour affichage dans l'historique
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('steam:achievement-unlocked', achievementData)
-    }
+    // B) NOTE : Volontairement non envoyé au Dashboard mainWindow pour ne pas afficher le popup dans l'app
 
     // C) Diffusion WebSocket à toutes les sources OBS
     obsServer.broadcastAchievement(achievementData)
@@ -371,6 +379,7 @@ function registerIpcHandlers() {
 
 // Cycle de vie de l'application Electron
 app.whenReady().then(() => {
+  settingsService.init()
   customizationService.init()
   registerIpcHandlers()
 
