@@ -1,5 +1,7 @@
 // Thème et style par défaut pour les notifications de succès
 export const DEFAULT_THEME = {
+  id: 'theme-steam-gold',
+  name: 'Steam Gold Classique',
   html: `<div class="custom-achievement-card">
   <div class="card-glow"></div>
   <div class="card-body">

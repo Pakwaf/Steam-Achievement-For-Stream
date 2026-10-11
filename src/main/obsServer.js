@@ -118,9 +118,13 @@ export class ObsServer {
     this.app.get('/obs/', serveOverlay)
 
     // 5. Route pour servir le fichier audio personnalisé sélectionné par l'utilisateur (sans aucun cache)
-    this.app.get('/audio/custom', (_req, res) => {
-      const theme = customizationService.getTheme()
-      if (theme.audioPath && fs.existsSync(theme.audioPath)) {
+    this.app.get('/audio/custom', (req, res) => {
+      const themeId = req.query.themeId
+      const theme = themeId
+        ? (customizationService.getThemeById(themeId) || customizationService.getActiveTheme())
+        : customizationService.getActiveTheme()
+
+      if (theme && theme.audioPath && fs.existsSync(theme.audioPath)) {
         const ext = path.extname(theme.audioPath).toLowerCase().replace('.', '')
         const mimeMap = {
           mp3: 'audio/mpeg',
@@ -592,6 +596,7 @@ ${theme.css || DEFAULT_THEME.css}
                 currentHtmlTemplate = payload.data.html;
               }
               if (payload.data.css) {
+                activeThemeCss = payload.data.css;
                 customCssElem.textContent = payload.data.css;
               }
               soundSettings = {
@@ -633,6 +638,8 @@ ${theme.css || DEFAULT_THEME.css}
       }
     }
 
+    let activeThemeCss = ${JSON.stringify(theme.css || DEFAULT_THEME.css)};
+
     // Affiche le succès pendant 5 secondes avec injection du HTML/CSS personnalisé
     function displayAchievement(data) {
       if (!data) return;
@@ -641,6 +648,10 @@ ${theme.css || DEFAULT_THEME.css}
         clearTimeout(toastTimeout);
       }
 
+      const isPreview = Boolean(data.previewTheme);
+      const previewTpl = isPreview && data.previewTheme.html;
+      const previewCss = isPreview && data.previewTheme.css;
+
       // 1. Jouer le son avec tolérance d'erreur
       try {
         playNotificationSound();
@@ -648,8 +659,16 @@ ${theme.css || DEFAULT_THEME.css}
         console.warn('[OBS Sound] Erreur son:', err);
       }
 
+      // Si mode preview dans l'éditeur : appliquer le CSS temporaire
+      if (previewCss) {
+        customCssElem.textContent = previewCss;
+      }
+
       // 2. Générer le HTML personnalisé avec les données remplacées (fallback garanti)
-      const tpl = (currentHtmlTemplate && currentHtmlTemplate.trim()) ? currentHtmlTemplate : defaultHtml;
+      const tpl = (previewTpl && previewTpl.trim())
+        ? previewTpl
+        : ((currentHtmlTemplate && currentHtmlTemplate.trim()) ? currentHtmlTemplate : defaultHtml);
+
       const rendered = renderCustomHtml(tpl, data);
       achSlot.innerHTML = rendered;
 
@@ -670,6 +689,9 @@ ${theme.css || DEFAULT_THEME.css}
 
         setTimeout(function() {
           achSlot.innerHTML = '';
+          if (previewCss) {
+            customCssElem.textContent = activeThemeCss;
+          }
         }, 450);
       }, 5000);
     }

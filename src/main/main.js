@@ -186,25 +186,98 @@ function registerIpcHandlers() {
     return obsServer.getStatus()
   })
 
-  // 8. Récupération du thème de personnalisation (HTML, CSS, Audio)
+  // 8. Récupération de la bibliothèque complète de thèmes
+  ipcMain.handle('customization:get-library', () => {
+    return customizationService.getLibrary()
+  })
+
+  // 9. Récupération du thème actif pour les overlays
+  ipcMain.handle('customization:get-active', () => {
+    return customizationService.getActiveTheme()
+  })
+
+  // Compatibilité ascendante : alias vers getActiveTheme
   ipcMain.handle('customization:get', () => {
-    return customizationService.getTheme()
+    return customizationService.getActiveTheme()
   })
 
-  // 9. Sauvegarde du thème de personnalisation
+  // 10. Activation d'un thème précis pour les overlays
+  ipcMain.handle('customization:set-active', (_event, themeId) => {
+    const result = customizationService.setActiveTheme(themeId)
+    if (result.success) {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('customization:updated', result.activeTheme)
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('customization:updated', result.activeTheme)
+        mainWindow.webContents.send('customization:library-updated', result.library)
+      }
+      obsServer.broadcastCustomization(result.activeTheme)
+    }
+    return result
+  })
+
+  // 11. Sauvegarde / mise à jour d'un thème spécifique
+  ipcMain.handle('customization:save-theme', (_event, themeData) => {
+    const result = customizationService.saveTheme(themeData)
+    if (result.success) {
+      const activeTheme = customizationService.getActiveTheme()
+      if (themeData.id === activeTheme.id) {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send('customization:updated', activeTheme)
+        }
+        obsServer.broadcastCustomization(activeTheme)
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('customization:library-updated', result.library)
+        mainWindow.webContents.send('customization:updated', activeTheme)
+      }
+    }
+    return result
+  })
+
+  // Compatibilité ascendante : sauvegarde du thème actif
   ipcMain.handle('customization:save', (_event, themeData) => {
-    const saved = customizationService.save(themeData)
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('customization:updated', saved)
-    }
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('customization:updated', saved)
-    }
-    obsServer.broadcastCustomization(saved)
-    return { success: true, theme: saved }
+    const active = customizationService.getActiveTheme()
+    return customizationService.saveTheme({ ...active, ...themeData })
   })
 
-  // 10. Réinitialisation au thème par défaut
+  // 12. Création d'un nouveau thème
+  ipcMain.handle('customization:create-theme', (_event, initialData) => {
+    const result = customizationService.createTheme(initialData)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('customization:library-updated', result.library)
+    }
+    return result
+  })
+
+  // 13. Duplication d'un thème existant
+  ipcMain.handle('customization:duplicate-theme', (_event, id) => {
+    const result = customizationService.duplicateTheme(id)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('customization:library-updated', result.library)
+    }
+    return result
+  })
+
+  // 14. Suppression d'un thème avec confirmation
+  ipcMain.handle('customization:delete-theme', (_event, id) => {
+    const result = customizationService.deleteTheme(id)
+    if (result.success) {
+      const activeTheme = customizationService.getActiveTheme()
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('customization:updated', activeTheme)
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('customization:library-updated', result.library)
+        mainWindow.webContents.send('customization:updated', activeTheme)
+      }
+      obsServer.broadcastCustomization(activeTheme)
+    }
+    return result
+  })
+
+  // 15. Réinitialisation au thème par défaut
   ipcMain.handle('customization:reset', () => {
     const defaultTheme = customizationService.reset()
     if (overlayWindow && !overlayWindow.isDestroyed()) {
@@ -212,12 +285,13 @@ function registerIpcHandlers() {
     }
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('customization:updated', defaultTheme)
+      mainWindow.webContents.send('customization:library-updated', customizationService.getLibrary())
     }
     obsServer.broadcastCustomization(defaultTheme)
     return { success: true, theme: defaultTheme }
   })
 
-  // 11. Boîte de dialogue pour sélectionner un fichier audio local
+  // 16. Boîte de dialogue pour sélectionner un fichier audio local
   ipcMain.handle('customization:select-audio', async () => {
     const win = mainWindow || overlayWindow
     const result = await dialog.showOpenDialog(win, {
@@ -234,13 +308,14 @@ function registerIpcHandlers() {
     return { success: false, canceled: true }
   })
 
-  // 12. Récupération directe des données audio personnalisées sous forme de Data URL Base64
-  ipcMain.handle('customization:get-audio-data', () => {
-    const theme = customizationService.getTheme()
-    if (theme.audioPath && fs.existsSync(theme.audioPath)) {
+  // 17. Récupération directe des données audio d'un fichier sous forme de Data URL Base64
+  ipcMain.handle('customization:get-audio-data', (_event, specificPath) => {
+    const theme = customizationService.getActiveTheme()
+    const targetPath = specificPath || theme.audioPath
+    if (targetPath && fs.existsSync(targetPath)) {
       try {
-        const buffer = fs.readFileSync(theme.audioPath)
-        const ext = path.extname(theme.audioPath).toLowerCase().replace('.', '')
+        const buffer = fs.readFileSync(targetPath)
+        const ext = path.extname(targetPath).toLowerCase().replace('.', '')
         const mimeMap = {
           mp3: 'audio/mpeg',
           wav: 'audio/wav',
@@ -262,7 +337,7 @@ function registerIpcHandlers() {
     return { hasAudio: false, dataUrl: null, rawBuffer: null }
   })
 
-  // 13. Diffusion d'un faux succès de test dans tout le pipeline (Desktop + OBS + Logs)
+  // 18. Diffusion d'un faux succès de test dans tout le pipeline (avec support du thème de preview)
   ipcMain.handle('steam:broadcast-test-achievement', (_event, customData) => {
     const achievementData = {
       appId: customData?.appId || '999999',
@@ -271,10 +346,11 @@ function registerIpcHandlers() {
       description: customData?.description || 'Bravo, tout fonctionne !',
       icon: customData?.icon || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
       gameName: customData?.gameName || 'Test Game',
-      unlockedAt: new Date().toISOString()
+      unlockedAt: new Date().toISOString(),
+      previewTheme: customData?.previewTheme || null
     }
 
-    console.log('[Main] 🧪 Diffusion d\'un succès factice de test :', achievementData.displayName)
+    console.log('[Main] 🧪 Diffusion d\'un succès factice de test :', achievementData.displayName, customData?.previewTheme ? '(Mode Thème Preview)' : '')
 
     // A) Envoi prioritaire à l'overlay transparent en jeu
     if (overlayWindow && !overlayWindow.isDestroyed()) {

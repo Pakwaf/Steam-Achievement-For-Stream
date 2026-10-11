@@ -2,7 +2,7 @@
   <div class="desktop-overlay-container">
     <!-- Style CSS utilisateur injecté dynamiquement avec fallback garanti -->
     <component :is="'style'">
-      {{ currentTheme.css || DEFAULT_THEME.css }}
+      {{ activePreviewTheme?.css || currentTheme.css || DEFAULT_THEME.css }}
     </component>
 
     <!-- Zone de rendu plein écran pour la notification de succès sur l'écran du joueur -->
@@ -67,17 +67,23 @@ onMounted(async () => {
   }
 })
 
+const activePreviewTheme = ref(null)
+
 // Déclenche l'affichage dynamique pendant 5 secondes avec son et animations
 function triggerAchievement(achievement) {
   if (dismissTimer) clearTimeout(dismissTimer)
   if (leaveTimer) clearTimeout(leaveTimer)
 
+  // Utiliser le thème de preview (si test en cours dans l'éditeur) ou le thème actif
+  const effectiveTheme = achievement.previewTheme || currentTheme.value
+  activePreviewTheme.value = achievement.previewTheme || null
+
   // 1. Jouer le son configuré via le moteur audio fiable
-  playAchievementSound(currentTheme.value)
+  playAchievementSound(effectiveTheme)
 
   // 2. Remplacer les placeholders {title}, {description}, {icon}, {game} avec fallback garanti
-  const tpl = (currentTheme.value.html && currentTheme.value.html.trim())
-    ? currentTheme.value.html
+  const tpl = (effectiveTheme.html && effectiveTheme.html.trim())
+    ? effectiveTheme.html
     : DEFAULT_THEME.html
 
   renderedHtml.value = replacePlaceholders(tpl, achievement)
@@ -103,6 +109,7 @@ function triggerAchievement(achievement) {
     // 5. Fin de l'animation de sortie : nettoyage du HTML
     leaveTimer = setTimeout(() => {
       renderedHtml.value = ''
+      activePreviewTheme.value = null
     }, 450)
   }, 5000)
 }

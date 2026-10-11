@@ -42,7 +42,7 @@
         </div>
         <div class="brand-text">
           <h1>Steam Custom Achievements</h1>
-          <span class="badge-phase">Phase 4 • Moteur de personnalisation & Test</span>
+          <span class="badge-phase">Phase 5 • Bibliothèque de Thèmes</span>
         </div>
       </div>
       <div class="header-status-group">
@@ -240,8 +240,135 @@
           </div>
         </div>
 
-        <!-- 3. NOUVEAU EN PHASE 4 : Moteur de personnalisation HTML / CSS / Audio et Mode Test -->
-        <CustomizationEditor />
+        <!-- 3. NOUVEAU EN PHASE 5 : Bibliothèque de Thèmes & Éditeur Modulaire -->
+        <div v-if="currentView === 'editor'" class="editor-view-wrapper">
+          <CustomizationEditor
+            :target-theme="editingTheme"
+            :is-active-theme="editingTheme?.id === themeLibrary.activeThemeId"
+            @back="closeEditor"
+            @saved="onEditorThemeSaved"
+            @activate="handleActivateTheme"
+          />
+        </div>
+
+        <div v-else class="library-section-card">
+          <div class="library-header">
+            <div class="library-title-group">
+              <div class="library-icon-glow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="lib-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 00-2.25 2.25v6" />
+                </svg>
+              </div>
+              <div>
+                <div class="title-with-pill">
+                  <h3>Bibliothèque de Thèmes</h3>
+                  <span class="theme-count-pill">{{ themeLibrary.themes.length }} Thème{{ themeLibrary.themes.length > 1 ? 's' : '' }}</span>
+                </div>
+                <p class="subtitle">Sélectionnez le thème actif pour vos streams du jour ou personnalisez vos designs</p>
+              </div>
+            </div>
+
+            <div class="library-header-actions">
+              <span v-if="libraryStatusMessage" class="lib-status-toast">{{ libraryStatusMessage }}</span>
+              <button class="btn-create-theme" title="Créer un nouveau thème basé sur le template de départ" @click="handleCreateNewTheme">
+                <span class="plus-icon">+</span>
+                <span>Créer un nouveau thème</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Grille de Cartes Modulaires -->
+          <div class="themes-grid">
+            <div
+              v-for="thm in themeLibrary.themes"
+              :key="thm.id"
+              class="theme-card"
+              :class="{ 'is-active-theme': thm.id === themeLibrary.activeThemeId }"
+            >
+              <!-- En-tête de la carte avec statut actif -->
+              <div class="card-status-bar">
+                <div v-if="thm.id === themeLibrary.activeThemeId" class="active-badge">
+                  <span class="active-sparkle">★</span>
+                  <span>THÈME ACTIF EN DIRECT</span>
+                </div>
+                <div v-else class="inactive-badge">
+                  <span>DISPONIBLE</span>
+                </div>
+
+                <div class="card-audio-indicator" :title="thm.audioPath || 'Carillon par défaut'">
+                  <span v-if="thm.audioPath" class="audio-chip custom">🎵 Son Perso</span>
+                  <span v-else class="audio-chip default">🔔 Son Standard</span>
+                </div>
+              </div>
+
+              <!-- Informations sur le thème -->
+              <div class="card-main-info">
+                <h4 class="theme-card-title">{{ thm.name }}</h4>
+                <span class="theme-id-sub">{{ thm.id }}</span>
+              </div>
+
+              <!-- Mini Rendu Visuel / Mockup de la Notification pour ce thème -->
+              <div class="card-preview-mockup">
+                <div class="mockup-frame">
+                  <div class="mockup-icon-box">
+                    <img :src="fallbackIcon" alt="Icon" class="mockup-icon" />
+                  </div>
+                  <div class="mockup-details">
+                    <div class="mockup-top-line">
+                      <span class="mockup-game">Steam Game</span>
+                      <span class="mockup-tag">DÉBLOQUÉ</span>
+                    </div>
+                    <span class="mockup-title">Succès Débloqué</span>
+                    <span class="mockup-desc">Rendu personnalisé pour ce thème</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions sur la carte -->
+              <div class="card-actions-toolbar">
+                <!-- Bouton Activer -->
+                <button
+                  class="btn-card-action btn-activate"
+                  :class="{ 'already-active': thm.id === themeLibrary.activeThemeId }"
+                  :disabled="thm.id === themeLibrary.activeThemeId"
+                  title="Définir ce thème pour les overlays Desktop et OBS"
+                  @click="handleActivateTheme(thm.id)"
+                >
+                  <span v-if="thm.id === themeLibrary.activeThemeId">✓ Actif</span>
+                  <span v-else>⚡ Activer</span>
+                </button>
+
+                <!-- Bouton Éditer -->
+                <button
+                  class="btn-card-action btn-edit"
+                  title="Modifier le code HTML, le CSS et le son de ce thème"
+                  @click="handleEditTheme(thm)"
+                >
+                  ✏ Éditer
+                </button>
+
+                <!-- Bouton Dupliquer -->
+                <button
+                  class="btn-card-action btn-duplicate"
+                  title="Créer une copie exacte de ce thème"
+                  @click="handleDuplicateTheme(thm.id)"
+                >
+                  ⎘ Dupliquer
+                </button>
+
+                <!-- Bouton Supprimer -->
+                <button
+                  class="btn-card-action btn-delete"
+                  :disabled="themeLibrary.themes.length <= 1"
+                  :title="themeLibrary.themes.length <= 1 ? 'Impossible de supprimer le seul thème restant' : 'Supprimer ce thème'"
+                  @click="handleDeleteTheme(thm)"
+                >
+                  🗑
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- 4. Panneau de Contrôle & Diagnostic du Tracker -->
         <div class="tracker-card">
@@ -384,6 +511,12 @@ const isSimulating = ref(false)
 let toastTimer = null
 let obsPollInterval = null
 
+// État de la Bibliothèque de Thèmes (Phase 5)
+const currentView = ref('library') // 'library' | 'editor'
+const editingTheme = ref(null)
+const themeLibrary = ref({ activeThemeId: '', themes: [] })
+const libraryStatusMessage = ref('')
+
 const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
 // Initialisation au montage
@@ -407,6 +540,9 @@ onMounted(async () => {
           if (obs.obsUrl) obsUrl.value = obs.obsUrl
         }
       }
+
+      // 4. Chargement de la bibliothèque de thèmes (Phase 5)
+      await fetchThemeLibrary()
     } catch (err) {
       console.error('Erreur initialisation dashboard:', err)
     }
@@ -416,12 +552,25 @@ onMounted(async () => {
       currentUser.value = user
     })
 
+    // Écoute des modifications de la bibliothèque de thèmes en temps réel
+    if (window.steamAPI.onThemeLibraryUpdated) {
+      window.steamAPI.onThemeLibraryUpdated((lib) => {
+        if (lib) {
+          themeLibrary.value = lib
+        }
+      })
+    }
+
     // Écoute des succès débloqués en temps réel (réels ou tests)
     window.steamAPI.onAchievementUnlocked(async (achievement) => {
       triggerAchievementToast(achievement)
       try {
         let theme = null
-        if (window.steamAPI?.getCustomization) {
+        if (achievement.previewTheme) {
+          theme = achievement.previewTheme
+        } else if (window.steamAPI?.getActiveTheme) {
+          theme = await window.steamAPI.getActiveTheme()
+        } else if (window.steamAPI?.getCustomization) {
           theme = await window.steamAPI.getCustomization()
         }
         await playAchievementSound(theme || {})
@@ -453,6 +602,120 @@ onMounted(async () => {
     }, 2500)
   }
 })
+
+// Récupération de la bibliothèque complète
+async function fetchThemeLibrary() {
+  if (window.steamAPI?.getThemeLibrary) {
+    try {
+      const lib = await window.steamAPI.getThemeLibrary()
+      if (lib) {
+        themeLibrary.value = lib
+      }
+    } catch (err) {
+      console.error('Erreur chargement bibliothèque de thèmes:', err)
+    }
+  }
+}
+
+// Active un thème pour les overlays
+async function handleActivateTheme(themeId) {
+  if (!window.steamAPI?.setActiveTheme) return
+  try {
+    const res = await window.steamAPI.setActiveTheme(themeId)
+    if (res.success) {
+      themeLibrary.value = res.library
+      showLibraryStatus(`Thème "${res.activeTheme?.name}" activé pour vos overlays ! ⚡`)
+    }
+  } catch (err) {
+    console.error('Erreur activation thème:', err)
+  }
+}
+
+// Ouvre l'éditeur pour ce thème précis
+function handleEditTheme(theme) {
+  editingTheme.value = JSON.parse(JSON.stringify(theme))
+  currentView.value = 'editor'
+}
+
+// Crée une copie exacte d'un thème
+async function handleDuplicateTheme(themeId) {
+  if (!window.steamAPI?.duplicateTheme) return
+  try {
+    const res = await window.steamAPI.duplicateTheme(themeId)
+    if (res.success) {
+      themeLibrary.value = res.library
+      showLibraryStatus(`Copie créée : "${res.duplicatedTheme?.name}" ✔`)
+    }
+  } catch (err) {
+    console.error('Erreur duplication thème:', err)
+  }
+}
+
+// Supprime un thème avec confirmation
+async function handleDeleteTheme(theme) {
+  if (themeLibrary.value.themes.length <= 1) {
+    alert('Impossible de supprimer le seul thème restant dans la bibliothèque.')
+    return
+  }
+
+  const confirmMsg = `Êtes-vous sûr de vouloir supprimer définitivement le thème "${theme.name}" ?`
+  if (!confirm(confirmMsg)) return
+
+  if (!window.steamAPI?.deleteTheme) return
+  try {
+    const res = await window.steamAPI.deleteTheme(theme.id)
+    if (res.success) {
+      themeLibrary.value = res.library
+      showLibraryStatus(`Thème "${theme.name}" supprimé ✔`)
+    } else if (res.error) {
+      alert(res.error)
+    }
+  } catch (err) {
+    console.error('Erreur suppression thème:', err)
+  }
+}
+
+// Crée un nouveau thème et ouvre l'éditeur
+async function handleCreateNewTheme() {
+  if (!window.steamAPI?.createTheme) return
+  try {
+    const defaultName = `Nouveau Thème (${themeLibrary.value.themes.length + 1})`
+    const res = await window.steamAPI.createTheme({ name: defaultName })
+    if (res.success) {
+      themeLibrary.value = res.library
+      editingTheme.value = res.theme
+      currentView.value = 'editor'
+      showLibraryStatus(`Nouveau thème créé : "${res.theme.name}" !`)
+    }
+  } catch (err) {
+    console.error('Erreur création thème:', err)
+  }
+}
+
+// Retour à la vue bibliothèque
+function closeEditor() {
+  currentView.value = 'library'
+  editingTheme.value = null
+  fetchThemeLibrary()
+}
+
+// Réception de l'enregistrement depuis l'éditeur
+function onEditorThemeSaved(savedTheme) {
+  if (savedTheme) {
+    const idx = themeLibrary.value.themes.findIndex((t) => t.id === savedTheme.id)
+    if (idx !== -1) {
+      themeLibrary.value.themes[idx] = savedTheme
+    }
+  }
+  fetchThemeLibrary()
+}
+
+function showLibraryStatus(msg) {
+  libraryStatusMessage.value = msg
+  setTimeout(() => {
+    if (libraryStatusMessage.value === msg) libraryStatusMessage.value = ''
+  }, 4000)
+}
 
 onUnmounted(() => {
   if (obsPollInterval) clearInterval(obsPollInterval)
@@ -1738,5 +2001,408 @@ function onIconError(e) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ========================================================
+   PHASE 5 : BIBLIOTHÈQUE DE THÈMES (CARDS MODULAIRES)
+   ======================================================== */
+.editor-view-wrapper {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.library-section-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.75rem 2rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.library-title-group {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.library-icon-glow {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(102, 192, 244, 0.18) 0%, rgba(27, 40, 56, 0.8) 100%);
+  border: 1px solid rgba(102, 192, 244, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #66c0f4;
+  box-shadow: 0 0 20px rgba(102, 192, 244, 0.25);
+  flex-shrink: 0;
+}
+
+.lib-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.title-with-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.2rem;
+}
+
+.title-with-pill h3 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.theme-count-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #66c0f4;
+  background: rgba(102, 192, 244, 0.15);
+  border: 1px solid rgba(102, 192, 244, 0.35);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.library-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lib-status-toast {
+  font-size: 0.8rem;
+  color: #a1cd44;
+  font-weight: 600;
+  background: rgba(161, 205, 68, 0.12);
+  border: 1px solid rgba(161, 205, 68, 0.4);
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+.btn-create-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: linear-gradient(135deg, #f0c330 0%, #d89e1b 100%);
+  color: #0b0e14;
+  font-weight: 800;
+  font-size: 0.88rem;
+  padding: 0.75rem 1.35rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(240, 195, 48, 0.35);
+  transition: var(--transition-smooth);
+}
+
+.btn-create-theme:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #ffd859 0%, #e6a722 100%);
+  box-shadow: 0 8px 24px rgba(240, 195, 48, 0.55);
+}
+
+.plus-icon {
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Grille de Thèmes */
+.themes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.theme-card {
+  background: rgba(14, 20, 29, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.theme-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(102, 192, 244, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(102, 192, 244, 0.15);
+}
+
+/* Carte active : mise en évidence visuelle forte */
+.theme-card.is-active-theme {
+  border: 2px solid #a1cd44;
+  background: rgba(18, 28, 38, 0.9);
+  box-shadow: 
+    0 12px 32px rgba(0, 0, 0, 0.7),
+    0 0 24px rgba(161, 205, 68, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.card-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.active-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(161, 205, 68, 0.18);
+  border: 1px solid rgba(161, 205, 68, 0.6);
+  color: #a1cd44;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  box-shadow: 0 0 10px rgba(161, 205, 68, 0.25);
+}
+
+.active-sparkle {
+  color: #ffe680;
+  font-size: 0.8rem;
+}
+
+.inactive-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #72849c;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+.card-audio-indicator {
+  font-size: 0.7rem;
+}
+
+.audio-chip {
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.audio-chip.custom {
+  background: rgba(161, 205, 68, 0.15);
+  color: #a1cd44;
+  border: 1px solid rgba(161, 205, 68, 0.3);
+}
+
+.audio-chip.default {
+  background: rgba(255, 255, 255, 0.05);
+  color: #8b9bb4;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.theme-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-id-sub {
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: #6a7c93;
+}
+
+/* Mini Rendu Mockup */
+.card-preview-mockup {
+  background: #090d13;
+  border-radius: 10px;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mockup-frame {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mockup-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(240, 195, 48, 0.6);
+  overflow: hidden;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.mockup-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mockup-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mockup-top-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1px;
+}
+
+.mockup-game {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #66c0f4;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockup-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #f0c330;
+}
+
+.mockup-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockup-desc {
+  font-size: 0.7rem;
+  color: #8b9bb4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions Toolbar */
+.card-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-card-action {
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-activate {
+  flex: 1;
+  background: linear-gradient(135deg, rgba(161, 205, 68, 0.25) 0%, rgba(121, 165, 38, 0.25) 100%);
+  border: 1px solid rgba(161, 205, 68, 0.6);
+  color: #a1cd44;
+}
+
+.btn-activate:hover:not(:disabled) {
+  background: #a1cd44;
+  color: #0b0e14;
+  box-shadow: 0 0 12px rgba(161, 205, 68, 0.4);
+}
+
+.btn-activate.already-active {
+  background: rgba(161, 205, 68, 0.12);
+  border-color: rgba(161, 205, 68, 0.4);
+  color: #a1cd44;
+  opacity: 0.8;
+  cursor: default;
+}
+
+.btn-edit {
+  background: rgba(102, 192, 244, 0.15);
+  border: 1px solid rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+}
+
+.btn-edit:hover {
+  background: #66c0f4;
+  color: #0b0e14;
+}
+
+.btn-duplicate {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c5d4e8;
+}
+
+.btn-duplicate:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.btn-delete {
+  background: rgba(235, 87, 87, 0.08);
+  border: 1px solid rgba(235, 87, 87, 0.2);
+  color: #ff8080;
+  padding: 0.45rem 0.6rem;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: rgba(235, 87, 87, 0.3);
+  border-color: #ff8080;
+  color: #fff;
+}
+
+.btn-delete:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 </style>

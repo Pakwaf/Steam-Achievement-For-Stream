@@ -1,6 +1,36 @@
 <template>
   <div class="customization-card">
-    <!-- En-tête du module de personnalisation -->
+    <!-- Barre supérieure de navigation dans l'éditeur -->
+    <div class="editor-top-nav">
+      <button class="btn-back-library" title="Revenir à la liste des thèmes" @click="goBack">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="back-icon">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+        </svg>
+        <span>Retour à la Bibliothèque</span>
+      </button>
+
+      <div class="editor-header-badges">
+        <span v-if="isActiveTheme" class="status-badge-active">
+          <span class="badge-dot pulse"></span>
+          Thème Actif sur Overlays
+        </span>
+        <span v-else class="status-badge-inactive">
+          <span class="badge-dot"></span>
+          Thème en cours d'édition
+        </span>
+
+        <button
+          v-if="!isActiveTheme"
+          class="btn-activate-now"
+          title="Définir immédiatement comme thème actif pour les overlays"
+          @click="activateCurrentTheme"
+        >
+          Activer pour le stream
+        </button>
+      </div>
+    </div>
+
+    <!-- En-tête principal : Nom du thème et actions clés -->
     <div class="customization-header">
       <div class="header-info">
         <div class="editor-icon-glow">
@@ -8,9 +38,20 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
           </svg>
         </div>
-        <div>
-          <h3>Moteur de Personnalisation (HTML / CSS / Audio)</h3>
-          <p class="subtitle">Modifiez le rendu visuel et sonore des notifications en direct pour Desktop & OBS</p>
+
+        <div class="theme-title-editor-wrap">
+          <label class="theme-name-label">Nom du thème</label>
+          <div class="theme-name-input-row">
+            <input
+              v-model="theme.name"
+              type="text"
+              class="theme-name-input"
+              placeholder="Ex : Steam Gold Classique..."
+              maxlength="45"
+              @blur="autoSaveThemeName"
+            />
+            <span class="theme-id-chip">ID: {{ theme.id }}</span>
+          </div>
         </div>
       </div>
 
@@ -20,12 +61,13 @@
           id="btn-test-notification"
           class="btn-test-primary"
           :disabled="isTesting"
+          title="Teste le code actuellement en cours d'édition sur Desktop et OBS"
           @click="triggerTestNotification"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" class="btn-play-icon">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <span>{{ isTesting ? 'Diffusion...' : 'Tester la notification' }}</span>
+          <span>{{ isTesting ? 'Diffusion...' : 'Tester ce thème' }}</span>
         </button>
       </div>
     </div>
@@ -69,7 +111,7 @@
       <div class="theme-actions-inline">
         <span v-if="saveMessage" class="save-status-pill">{{ saveMessage }}</span>
         <button class="btn-reset" title="Restaurer le template d'origine" @click="resetToDefault">
-          Réinitialiser par défaut
+          Réinitialiser
         </button>
         <button class="btn-save" :disabled="isSaving" @click="saveCustomization">
           {{ isSaving ? 'Enregistrement...' : 'Sauvegarder le thème' }}
@@ -229,7 +271,7 @@
               </option>
             </select>
             <p class="device-hint">
-              💡 <strong>Wave Link / Casque</strong> : Sélectionnez le canal où vous souhaitez entendre la notification (ex : <em>Wave Link SFX</em> ou votre sortie casque).
+              💡 <strong>Wave Link / Casque</strong> : Sélectionnez le canal où vous souhaitez entendre la notification (ex : <em>Wave Link SFX</em> ou votre sortie casque habituelle).
             </p>
           </div>
         </div>
@@ -244,7 +286,7 @@
               <strong>Option 1 (Le plus simple) :</strong> Dans les propriétés de la source navigateur OBS, <em>décochez</em> <code>Contrôler l'audio via OBS</code>. Le son passera directement par Windows sur votre sortie audio habituelle.
             </li>
             <li>
-              <strong>Option 2 (Mixage OBS / Wave Link) :</strong> Si <code>Contrôler l'audio via OBS</code> est <em>coché</em> (les barres vertes bougent dans OBS), allez dans le Mélangeur Audio OBS &gt; ⚙️ Propriétés audio avancées &gt; réglez la source navigateur sur <strong>"Surveillance et sortie"</strong>. Vérifiez ensuite dans OBS Paramètres &gt; Audio &gt; que le <em>Périphérique de surveillance</em> est bien activé sur Wave Link.
+              <strong>Option 2 (Mixage OBS / Wave Link) :</strong> Si <code>Contrôler l'audio via OBS</code> est <em>coché</em> (les barres vertes bougent dans OBS), allez dans le Mélangeur Audio OBS &gt; ⚙️ Propriétés audio avancées &gt; réglez la source navigateur sur <strong>"Surveillance et sortie"</strong>.
             </li>
           </ul>
         </div>
@@ -270,11 +312,22 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { playAchievementSound, getAudioOutputDevices } from '../utils/soundPlayer.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 
-const emit = defineEmits(['test'])
+const props = defineProps({
+  targetTheme: {
+    type: Object,
+    default: null
+  },
+  isActiveTheme: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['back', 'saved', 'activate'])
 
 const activeTab = ref('html')
 const isSaving = ref(false)
@@ -284,6 +337,8 @@ const saveMessage = ref('')
 const htmlTextarea = ref(null)
 
 const theme = ref({
+  id: 'theme-custom',
+  name: 'Nouveau Thème',
   html: '',
   css: '',
   audioPath: null,
@@ -303,6 +358,21 @@ const testData = {
   icon: 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 }
 
+// Synchronise le thème édité dès que targetTheme change
+watch(
+  () => props.targetTheme,
+  (newTheme) => {
+    if (newTheme) {
+      theme.value = {
+        ...DEFAULT_THEME,
+        ...JSON.parse(JSON.stringify(newTheme)),
+        audioDeviceId: newTheme.audioDeviceId || 'default'
+      }
+    }
+  },
+  { immediate: true, deep: true }
+)
+
 // Calcul du HTML d'aperçu en direct
 const previewHtml = computed(() => {
   if (!theme.value.html) return '<div style="color: #8b9bb4; padding: 20px;">Aucun HTML défini.</div>'
@@ -317,15 +387,15 @@ onMounted(async () => {
   // 1. Détection des périphériques audio (Wave Link / Windows)
   await refreshAudioDevices()
 
-  // 2. Chargement du thème personnalisé sauvegardé
-  if (window.steamAPI?.getCustomization) {
+  // 2. Si aucun targetTheme n'a été passé en prop, charger le thème actif depuis le backend
+  if (!props.targetTheme && window.steamAPI?.getActiveTheme) {
     try {
-      const saved = await window.steamAPI.getCustomization()
-      if (saved) {
+      const active = await window.steamAPI.getActiveTheme()
+      if (active) {
         theme.value = {
           ...DEFAULT_THEME,
-          ...saved,
-          audioDeviceId: saved.audioDeviceId || 'default'
+          ...active,
+          audioDeviceId: active.audioDeviceId || 'default'
         }
       }
     } catch (err) {
@@ -333,6 +403,20 @@ onMounted(async () => {
     }
   }
 })
+
+function goBack() {
+  emit('back')
+}
+
+function activateCurrentTheme() {
+  emit('activate', theme.value.id)
+}
+
+function autoSaveThemeName() {
+  if (theme.value.id && window.steamAPI?.saveTheme) {
+    window.steamAPI.saveTheme({ ...theme.value })
+  }
+}
 
 // Actualise la liste des sorties audio du système
 async function refreshAudioDevices() {
@@ -375,7 +459,7 @@ async function browseAudioFile() {
     if (res.success && res.filePath) {
       theme.value.audioPath = res.filePath
       showStatus('Fichier audio sélectionné ✔')
-      // Auto-sauvegarde immédiate du nouveau chemin audio
+      // Auto-sauvegarde immédiate du nouveau chemin audio pour ce thème
       await saveCustomization()
       // Jouer immédiatement le nouveau son sélectionné pour confirmation auditive
       await playTestSound()
@@ -413,16 +497,17 @@ async function playTestSound() {
   }
 }
 
-// Sauvegarde et diffusion en direct du thème
+// Sauvegarde du thème spécifique
 async function saveCustomization() {
   if (isSaving.value) return
   isSaving.value = true
 
   try {
-    if (window.steamAPI?.saveCustomization) {
-      const res = await window.steamAPI.saveCustomization({ ...theme.value })
+    if (window.steamAPI?.saveTheme) {
+      const res = await window.steamAPI.saveTheme({ ...theme.value })
       if (res.success) {
-        showStatus('Thème sauvegardé & diffusé en direct ✔')
+        showStatus('Thème sauvegardé avec succès ✔')
+        emit('saved', res.theme)
       }
     }
   } catch (err) {
@@ -435,27 +520,21 @@ async function saveCustomization() {
 
 // Réinitialise le template au design par défaut
 async function resetToDefault() {
-  if (!confirm('Voulez-vous vraiment restaurer le template et le style par défaut ?')) return
+  if (!confirm('Voulez-vous vraiment restaurer le template et le style par défaut pour ce thème ?')) return
 
-  try {
-    if (window.steamAPI?.resetCustomization) {
-      const res = await window.steamAPI.resetCustomization()
-      if (res.success && res.theme) {
-        theme.value = { ...DEFAULT_THEME, ...res.theme }
-        showStatus('Thème par défaut restauré ✔')
-      }
-    }
-  } catch (err) {
-    console.error('[CustomizationEditor] Erreur réinitialisation:', err)
-  }
+  theme.value.html = DEFAULT_THEME.html
+  theme.value.css = DEFAULT_THEME.css
+  theme.value.audioPath = null
+  await saveCustomization()
+  showStatus('Structure par défaut restaurée ✔')
 }
 
-// Déclenche le faux succès de test dans tout le pipeline (Dashboard + Overlay Desktop + OBS)
+// Déclenche le faux succès de test en utilisant LE CODE EN COURS D'ÉDITION pour la prévisualisation
 async function triggerTestNotification() {
   if (isTesting.value) return
   isTesting.value = true
 
-  // Jouer également le son immédiatement dans la fenêtre active pour retour instantané
+  // 1. Jouer immédiatement le son du thème en cours d'édition dans l'application
   playAchievementSound({
     soundEnabled: theme.value.soundEnabled,
     soundVolume: theme.value.soundVolume,
@@ -463,12 +542,22 @@ async function triggerTestNotification() {
     audioDeviceId: theme.value.audioDeviceId
   })
 
+  // 2. Diffuser le test avec le thème en cours d'édition pour aperçu temporaire sur Desktop et OBS
   try {
     if (window.steamAPI?.broadcastTestAchievement) {
-      await window.steamAPI.broadcastTestAchievement({ ...testData })
-      showStatus('Notification de test diffusée avec succès 🚀')
-    } else {
-      emit('test', testData)
+      await window.steamAPI.broadcastTestAchievement({
+        ...testData,
+        previewTheme: {
+          id: theme.value.id,
+          name: theme.value.name,
+          html: theme.value.html,
+          css: theme.value.css,
+          audioPath: theme.value.audioPath,
+          soundEnabled: theme.value.soundEnabled,
+          soundVolume: theme.value.soundVolume
+        }
+      })
+      showStatus('Notification de test diffusée avec ce thème 🚀')
     }
   } catch (err) {
     console.error('[CustomizationEditor] Erreur test notification:', err)
@@ -500,22 +589,123 @@ function showStatus(msg) {
   gap: 1.25rem;
 }
 
+/* Barre de navigation supérieure */
+.editor-top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-back-library {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c5d4e8;
+  padding: 0.5rem 0.95rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-back-library:hover {
+  background: rgba(102, 192, 244, 0.15);
+  border-color: rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+  transform: translateX(-2px);
+}
+
+.back-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.editor-header-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status-badge-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(161, 205, 68, 0.15);
+  border: 1px solid rgba(161, 205, 68, 0.5);
+  color: #a1cd44;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.status-badge-inactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #9cb0c9;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9cb0c9;
+}
+
+.status-badge-active .badge-dot {
+  background: #a1cd44;
+  box-shadow: 0 0 8px #a1cd44;
+}
+
+.btn-activate-now {
+  background: linear-gradient(135deg, rgba(161, 205, 68, 0.25) 0%, rgba(121, 165, 38, 0.25) 100%);
+  border: 1px solid rgba(161, 205, 68, 0.6);
+  color: #a1cd44;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-activate-now:hover {
+  background: #a1cd44;
+  color: #0b0e14;
+  box-shadow: 0 0 12px rgba(161, 205, 68, 0.4);
+}
+
+/* En-tête principal */
 .customization-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .header-info {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex: 1;
 }
 
 .editor-icon-glow {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
   background: rgba(240, 195, 48, 0.12);
   border: 1px solid rgba(240, 195, 48, 0.4);
@@ -524,6 +714,7 @@ function showStatus(msg) {
   justify-content: center;
   color: #f0c330;
   box-shadow: 0 0 16px rgba(240, 195, 48, 0.2);
+  flex-shrink: 0;
 }
 
 .wand-icon {
@@ -531,16 +722,54 @@ function showStatus(msg) {
   height: 24px;
 }
 
-.header-info h3 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 0.2rem;
+.theme-title-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
 }
 
-.subtitle {
-  font-size: 0.8rem;
-  color: var(--steam-text-muted);
+.theme-name-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #66c0f4;
+  letter-spacing: 0.05em;
+}
+
+.theme-name-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.theme-name-input {
+  background: rgba(14, 20, 29, 0.85);
+  border: 1px solid rgba(102, 192, 244, 0.35);
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  outline: none;
+  width: 100%;
+  max-width: 360px;
+  transition: var(--transition-smooth);
+}
+
+.theme-name-input:focus {
+  border-color: #66c0f4;
+  box-shadow: 0 0 12px rgba(102, 192, 244, 0.35);
+  background: rgba(14, 20, 29, 1);
+}
+
+.theme-id-chip {
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #72849c;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
 }
 
 .btn-test-primary {
@@ -557,6 +786,7 @@ function showStatus(msg) {
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(240, 195, 48, 0.35);
   transition: var(--transition-smooth);
+  white-space: nowrap;
 }
 
 .btn-test-primary:hover:not(:disabled) {
@@ -798,78 +1028,77 @@ function showStatus(msg) {
 }
 
 .audio-status-box h4 {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #fff;
+  margin-bottom: 0.15rem;
 }
 
 .audio-sub {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--steam-text-muted);
 }
 
 .audio-file-actions {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .btn-select-file {
   background: rgba(102, 192, 244, 0.15);
-  border: 1px solid rgba(102, 192, 244, 0.35);
+  border: 1px solid rgba(102, 192, 244, 0.4);
   color: #66c0f4;
   font-weight: 600;
-  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  padding: 0.45rem 0.9rem;
   border-radius: 8px;
-  font-size: 0.82rem;
   cursor: pointer;
   transition: var(--transition-smooth);
 }
 
 .btn-select-file:hover {
   background: rgba(102, 192, 244, 0.3);
+  color: #fff;
 }
 
 .btn-clear-audio {
   background: rgba(235, 87, 87, 0.15);
   border: 1px solid rgba(235, 87, 87, 0.35);
   color: #ff8080;
-  padding: 0.5rem 0.85rem;
+  font-size: 0.8rem;
+  padding: 0.45rem 0.75rem;
   border-radius: 8px;
-  font-size: 0.82rem;
   cursor: pointer;
 }
 
 .audio-file-path-row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 0.5rem 0.85rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
 }
 
 .path-label {
-  font-size: 0.75rem;
   color: var(--steam-text-muted);
   font-weight: 600;
 }
 
 .path-text {
-  font-family: monospace;
-  font-size: 0.8rem;
   color: #a1cd44;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .audio-settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .setting-item {
@@ -879,16 +1108,17 @@ function showStatus(msg) {
 }
 
 .setting-label {
-  font-size: 0.78rem;
-  color: var(--steam-text-muted);
+  font-size: 0.8rem;
   font-weight: 600;
+  color: #c5d4e8;
 }
 
 .toggle-switch {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
+  user-select: none;
 }
 
 .toggle-switch input {
@@ -900,12 +1130,12 @@ function showStatus(msg) {
   width: 44px;
   height: 24px;
   background-color: rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
+  border-radius: 24px;
   transition: 0.3s;
 }
 
 .slider::before {
-  content: '';
+  content: "";
   position: absolute;
   height: 18px;
   width: 18px;
@@ -916,167 +1146,176 @@ function showStatus(msg) {
   transition: 0.3s;
 }
 
-.toggle-switch input:checked + .slider {
+input:checked + .slider {
   background-color: #a1cd44;
 }
 
-.toggle-switch input:checked + .slider::before {
+input:checked + .slider::before {
   transform: translateX(20px);
 }
 
 .toggle-text {
   font-size: 0.82rem;
   color: #fff;
+  font-weight: 600;
 }
 
 .volume-slider-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.85rem;
 }
 
 .range-slider {
   flex: 1;
-  accent-color: var(--steam-blue);
+  accent-color: #f0c330;
   cursor: pointer;
 }
 
 .btn-play-test-sound {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 0.4rem 0.85rem;
-  border-radius: 8px;
-  font-size: 0.8rem;
+  background: rgba(240, 195, 48, 0.15);
+  border: 1px solid rgba(240, 195, 48, 0.4);
+  color: #f0c330;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
+  transition: var(--transition-smooth);
 }
 
 .btn-play-test-sound:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
+  background: #f0c330;
+  color: #0b0e14;
 }
 
-/* Carte de sélection de sortie audio */
+.btn-play-test-sound:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Sélecteur de sortie audio */
 .device-selector-card {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(102, 192, 244, 0.2);
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .device-label-row {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
 }
 
 .btn-refresh-devices {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #a4b4cc;
-  padding: 0.2rem 0.6rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  background: none;
+  border: none;
+  color: #66c0f4;
+  font-size: 0.72rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: var(--transition-smooth);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
 }
 
 .btn-refresh-devices:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: rgba(102, 192, 244, 0.15);
 }
 
 .device-select {
-  background: #090d13;
-  color: #fff;
-  border: 1px solid rgba(102, 192, 244, 0.35);
+  width: 100%;
+  background: rgba(14, 20, 29, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
-  padding: 0.6rem 0.85rem;
-  font-size: 0.85rem;
-  font-family: inherit;
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
   outline: none;
   cursor: pointer;
 }
 
 .device-select:focus {
   border-color: #66c0f4;
-  box-shadow: 0 0 10px rgba(102, 192, 244, 0.3);
 }
 
 .device-hint {
-  font-size: 0.78rem;
-  color: #a4b4cc;
-  line-height: 1.4;
+  font-size: 0.72rem;
+  color: var(--steam-text-muted);
   margin-top: 0.25rem;
 }
 
-/* Astuces OBS Studio */
 .obs-sound-tips-card {
-  background: rgba(20, 28, 40, 0.7);
-  border: 1px solid rgba(240, 195, 48, 0.3);
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
 }
 
 .tips-header {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: #f0c330;
+  color: #66c0f4;
+  margin-bottom: 0.35rem;
 }
 
 .tips-list {
-  font-size: 0.78rem;
-  color: #cbd5e1;
-  line-height: 1.5;
-  padding-left: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.74rem;
+  color: #a4b4cc;
+  line-height: 1.45;
 }
 
 .tips-list code {
+  color: #f0c330;
   background: rgba(0, 0, 0, 0.4);
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  color: #66c0f4;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
 }
 
-/* Onglet Aperçu */
+/* Onglet Aperçu en direct */
 .preview-stage-container {
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px dashed rgba(102, 192, 244, 0.3);
   background: #090d13;
-  min-height: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  min-height: 280px;
   position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
 }
 
 .preview-backdrop {
+  width: 100%;
+  height: 280px;
   position: relative;
-  min-height: 240px;
-  padding: 1.5rem;
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  background-image: 
+    linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.02) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.02) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
 }
 
 .preview-watermark {
   position: absolute;
-  top: 1rem;
-  left: 1rem;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.3);
-  letter-spacing: 0.05em;
+  top: 12px;
+  left: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
 }
 
 .preview-slot {
   width: 100%;
-  display: flex;
-  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+  pointer-events: none;
 }
 </style>
