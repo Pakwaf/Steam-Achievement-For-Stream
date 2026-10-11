@@ -27,17 +27,26 @@
   padding: 0;
 }
 
+html, body {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 body {
   font-family: var(--font-family);
-  background-color: var(--bg-primary);
-  background-image: 
-    radial-gradient(circle at 15% 20%, rgba(30, 60, 90, 0.25) 0%, transparent 40%),
-    radial-gradient(circle at 85% 80%, rgba(20, 100, 150, 0.15) 0%, transparent 45%);
   color: var(--steam-text-main);
   min-height: 100vh;
   overflow-x: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Arrière-plan Steam appliqué uniquement sur la fenêtre principale du Dashboard */
+body:not(.transparent-view) {
+  background-color: var(--bg-primary) !important;
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(30, 60, 90, 0.25) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(20, 100, 150, 0.15) 0%, transparent 45%) !important;
 }
 
 /* Scrollbar personnalisée */

@@ -151,6 +151,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .manage(app_state)
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if window.label() == "main" {
+                    std::process::exit(0);
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             login,
             logout,
@@ -173,10 +180,16 @@ pub fn run() {
                 )?;
             }
 
-            // Récupère la fenêtre d'overlay transparent et fait traverser les clics souris
+            // Récupère la fenêtre d'overlay transparent, fait traverser les clics souris
+            // et dimensionne à l'écran complet sans activer le mode plein écran exclusif de Windows
             if let Some(overlay) = app.get_webview_window("overlay") {
                 if let Err(e) = overlay.set_ignore_cursor_events(true) {
                     eprintln!("Erreur set_ignore_cursor_events sur overlay: {e}");
+                }
+                if let Ok(Some(monitor)) = overlay.primary_monitor() {
+                    let size = monitor.size();
+                    let _ = overlay.set_size(tauri::Size::Physical(*size));
+                    let _ = overlay.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: 0, y: 0 }));
                 }
             }
 
