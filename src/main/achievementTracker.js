@@ -167,7 +167,7 @@ export class AchievementTracker {
             const regPath = path.normalize(match[1].trim())
             if (fs.existsSync(regPath)) return regPath
           }
-        } catch {}
+        } catch { }
       }
 
       const defaultWindowsPaths = [
@@ -268,7 +268,7 @@ export class AchievementTracker {
     for (const filePath of this.watchedFiles) {
       try {
         fs.unwatchFile(filePath)
-      } catch {}
+      } catch { }
     }
     this.watchedFiles = []
     this.watchers = []
@@ -302,7 +302,6 @@ export class AchievementTracker {
       this.pollActiveGame()
     }, 3500)
   }
-
   /**
    * Interroge GetPlayerSummaries pour savoir si un jeu Steam est en cours d'exécution
    */
@@ -524,7 +523,7 @@ export class AchievementTracker {
       if (fd !== null) {
         try {
           fs.closeSync(fd)
-        } catch {}
+        } catch { }
       }
     }
   }
