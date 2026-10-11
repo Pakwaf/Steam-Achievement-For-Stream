@@ -587,7 +587,10 @@ onMounted(async () => {
       // 0. Récupération de la clé Steam API existante pour diriger l'utilisateur vers la bonne étape
       if (window.steamAPI.getSteamApiKey) {
         const res = await window.steamAPI.getSteamApiKey()
-        const rawKey = typeof res === 'string' ? res : (res?.apiKey || '')
+        let rawKey = typeof res === 'string' ? res : (res?.apiKey || '')
+        if (!rawKey && typeof localStorage !== 'undefined') {
+          rawKey = localStorage.getItem('steam_api_key') || ''
+        }
         const trimmedKey = (rawKey || '').trim()
         if (trimmedKey && trimmedKey.length >= 8) {
           steamApiKey.value = trimmedKey
@@ -598,8 +601,16 @@ onMounted(async () => {
         }
       }
 
-      // 1. Utilisateur courant
-      const user = await window.steamAPI.getCurrentUser()
+      // 1. Utilisateur courant (depuis Rust backend ou localStorage)
+      let user = await window.steamAPI.getCurrentUser()
+      if (!user && typeof localStorage !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('steam_user')
+          if (stored) user = JSON.parse(stored)
+        } catch {
+          // ignore
+        }
+      }
       if (user) currentUser.value = user
 
       // 2. Statut du tracker de log
@@ -866,6 +877,9 @@ async function handleSaveApiKey() {
   isSavingKey.value = true
   try {
     const keyToSave = typeof steamApiKey.value === 'string' ? steamApiKey.value.trim() : ''
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('steam_api_key', keyToSave)
+    }
     if (window.steamAPI?.saveSteamApiKey) {
       await window.steamAPI.saveSteamApiKey(keyToSave)
     }
@@ -903,6 +917,9 @@ async function handleLogin() {
     const result = await window.steamAPI.login()
     if (result.success) {
       currentUser.value = result.user
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('steam_user', JSON.stringify(result.user))
+      }
     } else {
       errorMessage.value = result.error || 'Connexion échouée.'
     }
@@ -916,6 +933,9 @@ async function handleLogin() {
 // Déconnexion
 async function handleLogout() {
   try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('steam_user')
+    }
     if (window.steamAPI) {
       await window.steamAPI.logout()
     }

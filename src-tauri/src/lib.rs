@@ -17,6 +17,41 @@ pub struct AppState {
     pub api_key: Arc<RwLock<Option<String>>>,
 }
 
+fn get_app_dir(app: &AppHandle) -> std::path::PathBuf {
+    app.path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+}
+
+async fn read_app_config(app: &AppHandle) -> serde_json::Value {
+    let path = get_app_dir(app).join("config.json");
+    if path.exists() {
+        if let Ok(content) = tokio::fs::read_to_string(&path).await {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                return val;
+            }
+        }
+    }
+    serde_json::json!({})
+}
+
+async fn write_app_config(app: &AppHandle, patch: serde_json::Value) {
+    let dir = get_app_dir(app);
+    let _ = tokio::fs::create_dir_all(&dir).await;
+    let mut current = read_app_config(app).await;
+    if let (Some(cur_map), Some(patch_map)) = (current.as_object_mut(), patch.as_object()) {
+        for (k, v) in patch_map {
+            cur_map.insert(k.clone(), v.clone());
+        }
+    } else {
+        current = patch;
+    }
+    let path = dir.join("config.json");
+    if let Ok(json) = serde_json::to_string_pretty(&current) {
+        let _ = tokio::fs::write(&path, json).await;
+    }
+}
+
 #[tauri::command]
 async fn login(app: AppHandle, state: State<'_, AppState>) -> Result<SteamUser, String> {
     let key = state.api_key.read().await.clone();
@@ -30,6 +65,8 @@ async fn login(app: AppHandle, state: State<'_, AppState>) -> Result<SteamUser, 
     state.tracker.set_steam_id(user.steam_id.clone()).await;
     let _ = app.emit("steam:auth-status-changed", Some(&user));
 
+    write_app_config(&app, serde_json::json!({ "currentUser": &user })).await;
+
     Ok(user)
 }
 
@@ -41,13 +78,32 @@ async fn logout(app: AppHandle, state: State<'_, AppState>) -> Result<bool, Stri
     }
 
     let _ = app.emit("steam:auth-status-changed", Option::<&SteamUser>::None);
+
+    write_app_config(&app, serde_json::json!({ "currentUser": serde_json::Value::Null })).await;
+
     Ok(true)
 }
 
 #[tauri::command]
-async fn get_current_user(state: State<'_, AppState>) -> Result<Option<SteamUser>, String> {
-    let u = state.current_user.read().await.clone();
-    Ok(u)
+async fn get_current_user(app: AppHandle, state: State<'_, AppState>) -> Result<Option<SteamUser>, String> {
+    let mem_u = state.current_user.read().await.clone();
+    if mem_u.is_some() {
+        return Ok(mem_u);
+    }
+
+    let cfg = read_app_config(&app).await;
+    if let Some(user_val) = cfg.get("currentUser") {
+        if !user_val.is_null() {
+            if let Ok(u) = serde_json::from_value::<SteamUser>(user_val.clone()) {
+                let mut w = state.current_user.write().await;
+                *w = Some(u.clone());
+                state.tracker.set_steam_id(u.steam_id.clone()).await;
+                return Ok(Some(u));
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 #[tauri::command]
@@ -90,8 +146,26 @@ async fn broadcast_test_achievement(
 }
 
 #[tauri::command]
-async fn get_steam_api_key(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let k = state.api_key.read().await.clone().unwrap_or_default();
+async fn get_steam_api_key(app: AppHandle, state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let mem_key = state.api_key.read().await.clone().unwrap_or_default();
+    let k = if mem_key.trim().is_empty() {
+        let cfg = read_app_config(&app).await;
+        let file_key = cfg
+            .get("apiKey")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if !file_key.is_empty() {
+            let mut w = state.api_key.write().await;
+            *w = Some(file_key.clone());
+            state.tracker.set_api_key(file_key.clone()).await;
+        }
+        file_key
+    } else {
+        mem_key
+    };
+
     let has_key = !k.trim().is_empty();
     Ok(serde_json::json!({
         "apiKey": k,
@@ -101,6 +175,7 @@ async fn get_steam_api_key(state: State<'_, AppState>) -> Result<serde_json::Val
 
 #[tauri::command]
 async fn save_steam_api_key(
+    app: AppHandle,
     state: State<'_, AppState>,
     key: String,
 ) -> Result<serde_json::Value, String> {
@@ -112,11 +187,57 @@ async fn save_steam_api_key(
 
     state.tracker.set_api_key(clean_key.clone()).await;
 
+    write_app_config(&app, serde_json::json!({ "apiKey": &clean_key })).await;
+
     Ok(serde_json::json!({
         "success": true,
         "apiKey": clean_key,
         "hasKey": !clean_key.is_empty()
     }))
+}
+
+#[tauri::command]
+async fn get_theme_library(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
+    let dir = get_app_dir(&app);
+    let path = dir.join("themes.json");
+    if path.exists() {
+        if let Ok(content) = tokio::fs::read_to_string(&path).await {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                return Ok(Some(val));
+            }
+        }
+    }
+    Ok(None)
+}
+
+#[tauri::command]
+async fn save_theme_library(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    library: serde_json::Value,
+) -> Result<bool, String> {
+    let dir = get_app_dir(&app);
+    let _ = tokio::fs::create_dir_all(&dir).await;
+    let path = dir.join("themes.json");
+    if let Ok(json) = serde_json::to_string_pretty(&library) {
+        let _ = tokio::fs::write(&path, json).await;
+    }
+
+    // Extraction et mise à jour du thème actif pour OBS
+    if let Some(themes) = library.get("themes").and_then(|t| t.as_array()) {
+        let active_id = library.get("activeThemeId").and_then(|i| i.as_str());
+        let active_theme = themes
+            .iter()
+            .find(|t| active_id.map_or(false, |id| t.get("id").and_then(|i| i.as_str()) == Some(id)))
+            .or_else(|| themes.first());
+
+        if let Some(t) = active_theme {
+            state.obs.update_customization(t.clone()).await;
+            let _ = app.emit("customization:updated", t);
+        }
+    }
+
+    Ok(true)
 }
 
 #[tauri::command]
@@ -203,12 +324,14 @@ async fn get_audio_data(
 pub fn run() {
     let tracker = Arc::new(AchievementTracker::new());
     let obs = Arc::new(ObsServer::new(8080));
+    let current_user_arc = Arc::new(RwLock::new(None));
+    let api_key_arc = Arc::new(RwLock::new(None));
 
     let app_state = AppState {
         tracker: tracker.clone(),
         obs: obs.clone(),
-        current_user: Arc::new(RwLock::new(None)),
-        api_key: Arc::new(RwLock::new(None)),
+        current_user: current_user_arc.clone(),
+        api_key: api_key_arc.clone(),
     };
 
     tauri::Builder::default()
@@ -231,6 +354,8 @@ pub fn run() {
             broadcast_test_achievement,
             get_steam_api_key,
             save_steam_api_key,
+            get_theme_library,
+            save_theme_library,
             open_external,
             update_customization,
             select_audio_file,
@@ -258,12 +383,54 @@ pub fn run() {
                 }
             }
 
-            // Démarrage des services en arrière-plan
+            // Démarrage des services en arrière-plan et restauration de la config
             let app_handle = app.handle().clone();
             let tracker_service = tracker.clone();
             let obs_service = obs.clone();
+            let state_user = current_user_arc.clone();
+            let state_key = api_key_arc.clone();
 
             tauri::async_runtime::spawn(async move {
+                // 1. Restauration de la clé API et de l'utilisateur sauvegardés
+                let cfg = read_app_config(&app_handle).await;
+                if let Some(k) = cfg.get("apiKey").and_then(|v| v.as_str()) {
+                    let clean = k.trim().to_string();
+                    if !clean.is_empty() {
+                        let mut w = state_key.write().await;
+                        *w = Some(clean.clone());
+                        tracker_service.set_api_key(clean).await;
+                    }
+                }
+
+                if let Some(user_val) = cfg.get("currentUser") {
+                    if !user_val.is_null() {
+                        if let Ok(u) = serde_json::from_value::<SteamUser>(user_val.clone()) {
+                            let mut w = state_user.write().await;
+                            *w = Some(u.clone());
+                            tracker_service.set_steam_id(u.steam_id.clone()).await;
+                        }
+                    }
+                }
+
+                // 2. Restauration du thème actif dans le serveur OBS
+                let themes_path = get_app_dir(&app_handle).join("themes.json");
+                if themes_path.exists() {
+                    if let Ok(content) = tokio::fs::read_to_string(&themes_path).await {
+                        if let Ok(lib) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(themes) = lib.get("themes").and_then(|t| t.as_array()) {
+                                let active_id = lib.get("activeThemeId").and_then(|i| i.as_str());
+                                let active = themes
+                                    .iter()
+                                    .find(|t| active_id.map_or(false, |id| t.get("id").and_then(|i| i.as_str()) == Some(id)))
+                                    .or_else(|| themes.first());
+                                if let Some(t) = active {
+                                    obs_service.update_customization(t.clone()).await;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if let Err(e) = obs_service.clone().start(app_handle.clone()).await {
                     eprintln!("[ObsServer] Erreur démarrage: {e}");
                 }
