@@ -94,11 +94,16 @@ async fn get_current_user(app: AppHandle, state: State<'_, AppState>) -> Result<
     let cfg = read_app_config(&app).await;
     if let Some(user_val) = cfg.get("currentUser") {
         if !user_val.is_null() {
-            if let Ok(u) = serde_json::from_value::<SteamUser>(user_val.clone()) {
-                let mut w = state.current_user.write().await;
-                *w = Some(u.clone());
-                state.tracker.set_steam_id(u.steam_id.clone()).await;
-                return Ok(Some(u));
+            match serde_json::from_value::<SteamUser>(user_val.clone()) {
+                Ok(u) => {
+                    let mut w = state.current_user.write().await;
+                    *w = Some(u.clone());
+                    state.tracker.set_steam_id(u.steam_id.clone()).await;
+                    return Ok(Some(u));
+                }
+                Err(err) => {
+                    eprintln!("[Config] Erreur parsing currentUser: {err}");
+                }
             }
         }
     }
@@ -408,6 +413,7 @@ pub fn run() {
                             let mut w = state_user.write().await;
                             *w = Some(u.clone());
                             tracker_service.set_steam_id(u.steam_id.clone()).await;
+                            let _ = app_handle.emit("steam:auth-status-changed", Some(&u));
                         }
                     }
                 }

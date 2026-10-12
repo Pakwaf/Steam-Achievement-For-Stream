@@ -72,8 +72,15 @@
         </div>
       </div>
 
+      <!-- Écran de chargement initial (restauration de la session locale en cours) -->
+      <div v-if="isInitializing" class="session-loading-splash">
+        <div class="splash-spinner"></div>
+        <p class="splash-title">Chargement de votre session Steam...</p>
+        <span class="splash-subtitle">Vérification de votre configuration locale</span>
+      </div>
+
       <!-- État 1 : Utilisateur non connecté (Configuration Clé API puis Connexion) -->
-      <section v-if="!currentUser" class="auth-section">
+      <section v-else-if="!currentUser" class="auth-section">
         <!-- ÉTAPE 1 : Configuration initiale de la Clé Steam Web API -->
         <div v-if="authStep === 'apikey'" class="auth-card apikey-setup-card">
           <div class="auth-steps-header">
@@ -92,6 +99,22 @@
           <p class="auth-description">
             Nécessaire pour récupérer les visuels et informations officielles de vos succès.
           </p>
+
+          <!-- Notification de transparence et de confidentialité sur le stockage local -->
+          <div class="local-privacy-notice-box">
+            <div class="privacy-notice-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shield-notice-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              </svg>
+            </div>
+            <div class="privacy-notice-text">
+              <h4>Stockage 100% Local & Sauvegarde Automatique</h4>
+              <p>
+                Pour vous éviter d'avoir à remettre votre clé ou vous reconnecter à chaque lancement, vos identifiants sont sauvegardés <strong>exclusivement en local sur votre ordinateur</strong> (dans <code>%AppData%</code>).
+                Aucune donnée n'est envoyée à des tiers : tout reste privé et confidentiel sur votre PC.
+              </p>
+            </div>
+          </div>
 
           <!-- Bloc portail Steam -->
           <div class="apikey-portal-box">
@@ -165,6 +188,15 @@
             Connectez votre compte pour synchroniser vos succès en temps réel.
           </p>
 
+          <div class="session-persistence-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mini-save-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <span>Votre session restera enregistrée sur ce PC pour vos prochains lancements.</span>
+          </div>
+
           <div v-if="errorMessage" class="error-banner">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="error-icon">
               <circle cx="12" cy="12" r="10"></circle>
@@ -229,6 +261,9 @@
             </div>
 
             <div class="profile-actions-inline">
+              <button class="btn-secondary btn-manage-key" title="Gérer ou modifier la clé Steam API" @click="openApiKeyModal">
+                🔑 Clé API
+              </button>
               <button class="btn-secondary" title="Ouvrir le profil Steam" @click="openSteamProfile">
                 Profil Steam
               </button>
@@ -537,6 +572,52 @@
           </div>
         </div>
       </section>
+
+      <!-- Modal de Consultation / Modification de la Clé Steam API -->
+      <div v-if="showApiKeyModal" class="api-key-modal-overlay" @click.self="closeApiKeyModal">
+        <div class="api-key-modal-card">
+          <div class="modal-card-header">
+            <div class="modal-title-group">
+              <span class="modal-key-icon">🔑</span>
+              <h3>Configuration Clé Steam Web API</h3>
+            </div>
+            <button class="btn-close-modal" title="Fermer" @click="closeApiKeyModal">✕</button>
+          </div>
+
+          <p class="modal-desc">
+            Votre clé est enregistrée localement dans <code>%AppData%</code>. Elle permet de récupérer les icônes officielles et noms de succès.
+          </p>
+
+          <div class="apikey-input-section" style="margin-top: 1rem;">
+            <label class="apikey-label">
+              <span>Clé API Steam (32 caractères)</span>
+            </label>
+            <div class="key-input-wrapper">
+              <input
+                v-model="modalApiKey"
+                type="text"
+                class="key-text-input"
+                placeholder="Ex : 4B8A92FD7E83C1A4B02E9104..."
+                spellcheck="false"
+              />
+              <button class="btn-paste-key" title="Coller depuis le presse-papier" @click="pasteModalApiKey">
+                📋 Coller
+              </button>
+            </div>
+          </div>
+
+          <div v-if="modalKeySuccess" class="success-banner" style="margin-top: 1rem;">
+            <span>{{ modalKeySuccess }}</span>
+          </div>
+
+          <div class="modal-actions-footer">
+            <button class="btn-secondary" @click="closeApiKeyModal">Annuler</button>
+            <button class="btn-save-modal-key" @click="saveApiKeyFromModal">
+              Enregistrer les modifications
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -547,6 +628,7 @@ import CustomizationEditor from '../components/CustomizationEditor.vue'
 import ThemeCardPreview from '../components/ThemeCardPreview.vue'
 import { playAchievementSound } from '../utils/soundPlayer.js'
 
+const isInitializing = ref(true)
 const currentUser = ref(null)
 const isLoading = ref(false)
 const errorMessage = ref(null)
@@ -560,6 +642,9 @@ const authStep = ref('apikey') // 'apikey' | 'login'
 const steamApiKey = ref('')
 const isSavingKey = ref(false)
 const keySavedMessage = ref('')
+const showApiKeyModal = ref(false)
+const modalApiKey = ref('')
+const modalKeySuccess = ref('')
 
 // État du tracker, de l'OBS et des succès
 const trackerStatus = ref(null)
@@ -584,25 +669,28 @@ onMounted(async () => {
   isElectron.value = typeof window !== 'undefined' && !!window.steamAPI
   if (window.steamAPI) {
     try {
-      // 0. Récupération de la clé Steam API existante pour diriger l'utilisateur vers la bonne étape
-      if (window.steamAPI.getSteamApiKey) {
-        const res = await window.steamAPI.getSteamApiKey()
-        let rawKey = typeof res === 'string' ? res : (res?.apiKey || '')
-        if (!rawKey && typeof localStorage !== 'undefined') {
-          rawKey = localStorage.getItem('steam_api_key') || ''
-        }
-        const trimmedKey = (rawKey || '').trim()
-        if (trimmedKey && trimmedKey.length >= 8) {
-          steamApiKey.value = trimmedKey
-          authStep.value = 'login'
-        } else {
-          steamApiKey.value = ''
-          authStep.value = 'apikey'
-        }
+      // 0. Récupération parallèle instantanée de la clé Steam API et de l'utilisateur sauvegardé
+      const [keyRes, userRes] = await Promise.all([
+        window.steamAPI.getSteamApiKey ? window.steamAPI.getSteamApiKey().catch(() => ({ apiKey: '' })) : Promise.resolve({ apiKey: '' }),
+        window.steamAPI.getCurrentUser ? window.steamAPI.getCurrentUser().catch(() => null) : Promise.resolve(null)
+      ])
+
+      // Restauration de la clé API
+      let rawKey = typeof keyRes === 'string' ? keyRes : (keyRes?.apiKey || '')
+      if (!rawKey && typeof localStorage !== 'undefined') {
+        rawKey = localStorage.getItem('steam_api_key') || ''
+      }
+      const trimmedKey = (rawKey || '').trim()
+      if (trimmedKey && trimmedKey.length >= 8) {
+        steamApiKey.value = trimmedKey
+        authStep.value = 'login'
+      } else {
+        steamApiKey.value = ''
+        authStep.value = 'apikey'
       }
 
-      // 1. Utilisateur courant (depuis Rust backend ou localStorage)
-      let user = await window.steamAPI.getCurrentUser()
+      // Restauration de l'utilisateur connecté
+      let user = userRes
       if (!user && typeof localStorage !== 'undefined') {
         try {
           const stored = localStorage.getItem('steam_user')
@@ -611,13 +699,15 @@ onMounted(async () => {
           // ignore
         }
       }
-      if (user) currentUser.value = user
+      if (user) {
+        currentUser.value = user
+      }
 
-      // 2. Statut du tracker de log
+      // Statut du tracker de log
       const status = await window.steamAPI.getTrackerStatus()
       trackerStatus.value = status
 
-      // 3. Statut initial du serveur OBS
+      // Statut initial du serveur OBS
       if (window.steamAPI.getObsStatus) {
         const obs = await window.steamAPI.getObsStatus()
         if (obs) {
@@ -626,16 +716,20 @@ onMounted(async () => {
         }
       }
 
-      // 4. Chargement de la bibliothèque de thèmes (Phase 5)
+      // Chargement de la bibliothèque de thèmes modulaires
       await fetchThemeLibrary()
     } catch (err) {
       console.error('Erreur initialisation dashboard:', err)
+    } finally {
+      isInitializing.value = false
     }
 
     // Écoute des mises à jour d'authentification
-    window.steamAPI.onAuthStatusChanged((user) => {
-      currentUser.value = user
-    })
+    if (window.steamAPI.onAuthStatusChanged) {
+      window.steamAPI.onAuthStatusChanged((user) => {
+        currentUser.value = user
+      })
+    }
 
     // Écoute des modifications de la bibliothèque de thèmes en temps réel
     if (window.steamAPI.onThemeLibraryUpdated) {
@@ -941,9 +1035,48 @@ async function handleLogout() {
     }
     currentUser.value = null
     errorMessage.value = null
+    authStep.value = steamApiKey.value ? 'login' : 'apikey'
   } catch (err) {
     console.error('Erreur déconnexion:', err)
   }
+}
+
+// Gestion de la Clé API depuis le modal
+function openApiKeyModal() {
+  modalApiKey.value = steamApiKey.value || ''
+  modalKeySuccess.value = ''
+  showApiKeyModal.value = true
+}
+
+function closeApiKeyModal() {
+  showApiKeyModal.value = false
+}
+
+async function pasteModalApiKey() {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (text) {
+      modalApiKey.value = text.trim()
+    }
+  } catch (err) {
+    console.warn('[Dashboard] Impossible de lire le presse-papier:', err)
+  }
+}
+
+async function saveApiKeyFromModal() {
+  const clean = (modalApiKey.value || '').trim()
+  steamApiKey.value = clean
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('steam_api_key', clean)
+  }
+  if (window.steamAPI?.saveSteamApiKey) {
+    await window.steamAPI.saveSteamApiKey(clean)
+  }
+  modalKeySuccess.value = 'Clé API enregistrée avec succès dans votre configuration locale !'
+  setTimeout(() => {
+    modalKeySuccess.value = ''
+    showApiKeyModal.value = false
+  }, 1000)
 }
 
 function openSteamProfile() {
@@ -2802,5 +2935,216 @@ function onIconError(e) {
 .btn-delete:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Écran de chargement initial (restauration de session) */
+.session-loading-splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  text-align: center;
+  gap: 12px;
+}
+
+.splash-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3.5px solid rgba(102, 192, 244, 0.2);
+  border-top-color: #66c0f4;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.splash-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.splash-subtitle {
+  font-size: 0.88rem;
+  color: #8f98a0;
+}
+
+/* Bannière de Transparence Stockage Local & Confidentialité */
+.local-privacy-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(102, 192, 244, 0.08);
+  border: 1px solid rgba(102, 192, 244, 0.3);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0 1.5rem 0;
+  text-align: left;
+}
+
+.privacy-notice-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(102, 192, 244, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #66c0f4;
+  margin-top: 2px;
+}
+
+.shield-notice-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.privacy-notice-text h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #66c0f4;
+  margin: 0 0 4px 0;
+}
+
+.privacy-notice-text p {
+  font-size: 0.85rem;
+  color: #c7d5e0;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.privacy-notice-text code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: #ffd166;
+}
+
+/* Badge persistance session sur Step 2 */
+.session-persistence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(161, 205, 68, 0.1);
+  border: 1px solid rgba(161, 205, 68, 0.3);
+  color: #a1cd44;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin: 1rem auto;
+}
+
+.mini-save-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Modal Gestion Clé API */
+.api-key-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.api-key-modal-card {
+  width: 100%;
+  max-width: 520px;
+  background: #171d25;
+  border: 1px solid rgba(102, 192, 244, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(102, 192, 244, 0.2);
+  padding: 1.75rem;
+  color: #fff;
+}
+
+.modal-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-key-icon {
+  font-size: 1.3rem;
+}
+
+.modal-card-header h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  color: #8f98a0;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-close-modal:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-desc {
+  font-size: 0.88rem;
+  color: #8f98a0;
+  line-height: 1.45;
+  margin: 0 0 1rem 0;
+}
+
+.modal-desc code {
+  color: #66c0f4;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.modal-actions-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+.btn-save-modal-key {
+  background: linear-gradient(135deg, #4c9ee3 0%, #2f6cb3 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  padding: 0.65rem 1.4rem;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(76, 158, 227, 0.35);
+  transition: all 0.2s;
+}
+
+.btn-save-modal-key:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 6px 18px rgba(76, 158, 227, 0.5);
 }
 </style>

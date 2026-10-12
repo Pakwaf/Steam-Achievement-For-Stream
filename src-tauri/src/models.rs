@@ -4,10 +4,15 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct SteamUser {
     pub steam_id: String,
+    #[serde(default)]
     pub persona_name: String,
+    #[serde(default)]
     pub avatar: String,
+    #[serde(default)]
     pub profile_url: String,
+    #[serde(default)]
     pub online_state: String,
+    #[serde(default)]
     pub authenticated_at: String,
 }
 
