@@ -4,14 +4,10 @@ import {
   BUILTIN_THEMES,
   DEFAULT_THEME,
   STEAM_GOLD_THEME,
-  POKEMON_THEME,
   COZY_PIXEL_THEME,
   HORROR_THEME,
   DARK_FANTASY_THEME,
-  WII_THEME,
-  FRUTIGER_AERO_THEME,
-  CYBERPUNK_THEME,
-  MINIMAL_THEME
+  FRUTIGER_AERO_THEME
 } from '../themes/index.js'
 
 // Re-export des thèmes pour rétro-compatibilité
@@ -19,16 +15,13 @@ export {
   BUILTIN_THEMES,
   DEFAULT_THEME,
   STEAM_GOLD_THEME,
-  POKEMON_THEME,
   COZY_PIXEL_THEME,
   HORROR_THEME,
   DARK_FANTASY_THEME,
-  WII_THEME,
-  FRUTIGER_AERO_THEME,
-  CYBERPUNK_THEME,
-  MINIMAL_THEME
+  FRUTIGER_AERO_THEME
 }
 
+export const DEPRECATED_THEME_IDS = ['theme-minimal', 'theme-cyberpunk', 'theme-wii', 'theme-pokemon']
 const THEMES_FILENAME = 'themes.json'
 
 class ThemeStorageService {
@@ -106,11 +99,20 @@ class ThemeStorageService {
     }
 
     if (loaded) {
-      // Respect absolu des suppressions : ne jamais réinsérer un thème supprimé
+      // 1. Purge automatique des thèmes retirés de base (Minimaliste, Cyberpunk, Wii, Pokémon)
+      loaded.themes = (loaded.themes || []).filter((t) => !DEPRECATED_THEME_IDS.includes(t.id))
+
       const deletedIds = Array.isArray(loaded.deletedThemeIds) ? loaded.deletedThemeIds : []
+      for (const depId of DEPRECATED_THEME_IDS) {
+        if (!deletedIds.includes(depId)) {
+          deletedIds.push(depId)
+        }
+      }
+
+      // 2. Réinsérer les thèmes de base actifs s'ils ne sont pas déjà présents et non supprimés
       for (const builtin of BUILTIN_THEMES) {
         if (deletedIds.includes(builtin.id)) {
-          continue // L'utilisateur a expressément supprimé ce thème
+          continue
         }
         const existsInLoaded = loaded.themes.some((t) => t.id === builtin.id)
         if (!existsInLoaded) {
@@ -121,15 +123,21 @@ class ThemeStorageService {
           })
         }
       }
-      if (!Array.isArray(loaded.deletedThemeIds)) {
-        loaded.deletedThemeIds = deletedIds
+
+      loaded.deletedThemeIds = deletedIds
+
+      // 3. Si le thème actif était l'un des thèmes supprimés ou n'existe plus, basculer vers le thème par défaut
+      const activeStillExists = loaded.themes.some((t) => t.id === loaded.activeThemeId)
+      if (!activeStillExists || DEPRECATED_THEME_IDS.includes(loaded.activeThemeId)) {
+        loaded.activeThemeId = DEFAULT_THEME.id
       }
+
       this.cachedLibrary = loaded
     } else {
-      // Premier lancement : créer la bibliothèque avec tous les thèmes modulaires par défaut
+      // Premier lancement : créer la bibliothèque avec les 5 thèmes officiels
       this.cachedLibrary = {
         activeThemeId: DEFAULT_THEME.id,
-        deletedThemeIds: [],
+        deletedThemeIds: [...DEPRECATED_THEME_IDS],
         themes: BUILTIN_THEMES.map((t) => ({
           ...t,
           createdAt: new Date().toISOString(),
@@ -377,6 +385,181 @@ class ThemeStorageService {
       activeTheme: this.getActiveThemeSync(),
       library: { ...lib }
     }
+  }
+
+  /**
+   * Exporte un thème individuel sous forme de fichier JSON téléchargeable
+   */
+  async exportTheme(id) {
+    const lib = await this.loadLibrary()
+    const theme = lib.themes.find((t) => t.id === id)
+    if (!theme) {
+      return { success: false, error: 'Thème introuvable pour l\'export' }
+    }
+
+    const payload = {
+      _app: 'SteamOverlayStream',
+      version: '2.0',
+      type: 'single_theme',
+      exportedAt: new Date().toISOString(),
+      theme: {
+        name: theme.name,
+        html: theme.html,
+        css: theme.css,
+        visualEffect: theme.visualEffect || 'none',
+        soundEnabled: theme.soundEnabled ?? true,
+        soundVolume: theme.soundVolume ?? 0.8
+      }
+    }
+
+    const jsonString = JSON.stringify(payload, null, 2)
+    const safeName = (theme.name || 'theme').toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+    const fileName = `${safeName}.theme.json`
+
+    this.downloadJsonFile(fileName, jsonString)
+    return { success: true, fileName, theme: payload.theme }
+  }
+
+  /**
+   * Exporte toute la bibliothèque de thèmes personnalisés
+   */
+  async exportLibrary() {
+    const lib = await this.loadLibrary()
+    const payload = {
+      _app: 'SteamOverlayStream',
+      version: '2.0',
+      type: 'theme_library',
+      exportedAt: new Date().toISOString(),
+      activeThemeId: lib.activeThemeId,
+      themes: lib.themes.map((t) => ({
+        name: t.name,
+        html: t.html,
+        css: t.css,
+        visualEffect: t.visualEffect || 'none',
+        soundEnabled: t.soundEnabled ?? true,
+        soundVolume: t.soundVolume ?? 0.8
+      }))
+    }
+
+    const jsonString = JSON.stringify(payload, null, 2)
+    const fileName = `steam_themes_library_${Date.now()}.json`
+
+    this.downloadJsonFile(fileName, jsonString)
+    return { success: true, fileName, count: payload.themes.length }
+  }
+
+  /**
+   * Importe un thème (depuis un contenu JSON brut ou un objet parsé)
+   */
+  async importTheme(jsonOrString) {
+    try {
+      let data = jsonOrString
+      if (typeof jsonOrString === 'string') {
+        data = JSON.parse(jsonOrString)
+      }
+
+      // Si le payload vient d'un export unitaire
+      const raw = data.theme || data
+      if (!raw || !raw.html || !raw.css) {
+        return { success: false, error: 'Format de fichier thème invalide (HTML ou CSS manquant)' }
+      }
+
+      const lib = await this.loadLibrary()
+      const now = new Date().toISOString()
+      const newId = `imported-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+      const baseName = (raw.name || 'Thème Importé').trim()
+      
+      const newTheme = {
+        id: newId,
+        name: baseName,
+        html: raw.html,
+        css: raw.css,
+        visualEffect: raw.visualEffect || 'none',
+        audioPath: null,
+        audioDeviceId: 'default',
+        soundEnabled: raw.soundEnabled ?? true,
+        soundVolume: typeof raw.soundVolume === 'number' ? raw.soundVolume : 0.8,
+        createdAt: now,
+        updatedAt: now
+      }
+
+      lib.themes.unshift(newTheme)
+      lib.activeThemeId = newId
+      await this.persistLibrary()
+
+      return {
+        success: true,
+        importedTheme: { ...newTheme },
+        library: { ...lib }
+      }
+    } catch (err) {
+      console.error('[ThemeStorage] Erreur importTheme:', err)
+      return { success: false, error: `Erreur lors de l'import : ${err.message}` }
+    }
+  }
+
+  /**
+   * Importe une collection ou sauvegarde entière de thèmes
+   */
+  async importLibrary(jsonOrString) {
+    try {
+      let data = jsonOrString
+      if (typeof jsonOrString === 'string') {
+        data = JSON.parse(jsonOrString)
+      }
+
+      const list = Array.isArray(data) ? data : (data.themes || [data.theme || data])
+      if (!Array.isArray(list) || list.length === 0) {
+        return { success: false, error: 'Aucun thème valide trouvé dans le fichier' }
+      }
+
+      const lib = await this.loadLibrary()
+      const now = new Date().toISOString()
+      let count = 0
+
+      for (const item of list) {
+        if (!item || !item.html || !item.css) continue
+        const newId = `imported-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+        lib.themes.push({
+          id: newId,
+          name: (item.name || `Importé ${count + 1}`).trim(),
+          html: item.html,
+          css: item.css,
+          visualEffect: item.visualEffect || 'none',
+          audioPath: null,
+          audioDeviceId: 'default',
+          soundEnabled: item.soundEnabled ?? true,
+          soundVolume: typeof item.soundVolume === 'number' ? item.soundVolume : 0.8,
+          createdAt: now,
+          updatedAt: now
+        })
+        count++
+      }
+
+      if (count === 0) {
+        return { success: false, error: 'Aucun thème conforme n\'a pu être importé' }
+      }
+
+      await this.persistLibrary()
+      return { success: true, count, library: { ...lib } }
+    } catch (err) {
+      return { success: false, error: `Erreur import collection : ${err.message}` }
+    }
+  }
+
+  downloadJsonFile(filename, jsonString) {
+    if (typeof window === 'undefined' || !document?.createElement) return
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }, 150)
   }
 
   notifyLibraryUpdated() {

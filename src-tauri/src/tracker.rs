@@ -507,6 +507,8 @@ impl AchievementTracker {
             unlocked_at: chrono_like_now(),
             is_test: false,
             preview_theme: None,
+            tier: Some("common".to_string()),
+            rarity_percent: None,
         }
     }
 

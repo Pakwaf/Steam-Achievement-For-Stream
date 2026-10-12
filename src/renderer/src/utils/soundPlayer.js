@@ -120,49 +120,132 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer
 }
 
+// Configuration globale du son (partagée par tous les thèmes et configurable dans les paramètres généraux)
+let globalAudioSettings = {
+  deviceId: 'default',
+  soundEnabled: true,
+  soundVolume: 0.8
+}
+
+// Charger les paramètres audio globaux depuis le stockage local si disponible
+if (typeof localStorage !== 'undefined') {
+  try {
+    const saved = localStorage.getItem('steam_overlay_global_audio')
+    if (saved) {
+      globalAudioSettings = { ...globalAudioSettings, ...JSON.parse(saved) }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function getGlobalAudioSettings() {
+  return { ...globalAudioSettings }
+}
+
+export function setGlobalAudioSettings(settings = {}) {
+  globalAudioSettings = {
+    ...globalAudioSettings,
+    ...settings
+  }
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem('steam_overlay_global_audio', JSON.stringify(globalAudioSettings))
+    } catch {
+      // ignore
+    }
+  }
+  return { ...globalAudioSettings }
+}
+
 /**
- * Joue le carillon synthétique par défaut avec Web Audio API (D5 + A5 harmonisés)
+ * Joue le carillon synthétique par défaut avec Web Audio API adapté au TIER
+ * - 'common' : Chime classique Ré-La (D5 + A5)
+ * - 'rare'   : Arpège céleste étincelant Mi-Sol#-Do (E5 + G#5 + C6)
+ * - 'master' : Fanfare triomphante 4 notes 100% Platine (C5 + E5 + G5 + C6)
  */
-export async function playSynthesizedChime(volume = 0.8, deviceId = 'default') {
+export async function playSynthesizedChime(volume = 0.8, deviceId = 'default', tier = 'common') {
   try {
     const ctx = await getAudioContext()
     if (!ctx) return false
 
-    // Routage vers le périphérique spécifique si supporté
-    if (deviceId && deviceId !== 'default' && typeof ctx.setSinkId === 'function') {
+    // Priorité au périphérique global si configuré et si deviceId est 'default'
+    const targetDevice = (deviceId && deviceId !== 'default') ? deviceId : globalAudioSettings.deviceId
+
+    if (targetDevice && targetDevice !== 'default' && typeof ctx.setSinkId === 'function') {
       try {
-        await ctx.setSinkId(deviceId)
+        await ctx.setSinkId(targetDevice)
       } catch (e) {
         console.warn('[SoundPlayer] setSinkId non supporté ou ignoré pour le carillon:', e)
       }
     }
 
     const now = ctx.currentTime
-    const vol = Math.min(1, Math.max(0, volume)) * 0.35 // Volume agréable et bien audible
+    const vol = Math.min(1, Math.max(0, volume)) * 0.35
 
-    // Note 1 : Ré (D5) 587.33 Hz
-    const osc1 = ctx.createOscillator()
-    const gain1 = ctx.createGain()
-    osc1.type = 'triangle'
-    osc1.frequency.setValueAtTime(587.33, now)
-    gain1.gain.setValueAtTime(vol * 0.9, now)
-    gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.45)
-    osc1.connect(gain1)
-    gain1.connect(ctx.destination)
-    osc1.start(now)
-    osc1.stop(now + 0.46)
+    if (tier === 'master') {
+      // Fanfare triomphante Platine / 100% (Do5 -> Mi5 -> Sol5 -> Do6 avec résonance d'accords)
+      const notes = [
+        { f: 523.25, t: 0.00, dur: 0.35, v: 0.8 }, // C5
+        { f: 659.25, t: 0.12, dur: 0.40, v: 0.85 }, // E5
+        { f: 783.99, t: 0.24, dur: 0.45, v: 0.9 }, // G5
+        { f: 1046.50, t: 0.36, dur: 0.90, v: 1.2 } // C6 (triomphe)
+      ]
+      for (const note of notes) {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = note.f > 800 ? 'sine' : 'triangle'
+        osc.frequency.setValueAtTime(note.f, now + note.t)
+        gain.gain.setValueAtTime(vol * note.v, now + note.t)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + note.t + note.dur)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(now + note.t)
+        osc.stop(now + note.t + note.dur + 0.05)
+      }
+    } else if (tier === 'rare') {
+      // Arpège mystique / rare (< 10%) étincelant (Mi5 -> Sol#5 -> Do6)
+      const notes = [
+        { f: 659.25, t: 0.00, dur: 0.40, v: 0.85 }, // E5
+        { f: 830.61, t: 0.11, dur: 0.45, v: 0.95 }, // G#5
+        { f: 1046.50, t: 0.22, dur: 0.75, v: 1.1 }  // C6
+      ]
+      for (const note of notes) {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(note.f, now + note.t)
+        gain.gain.setValueAtTime(vol * note.v, now + note.t)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + note.t + note.dur)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(now + note.t)
+        osc.stop(now + note.t + note.dur + 0.05)
+      }
+    } else {
+      // Standard (> 10%) : Ré (D5) -> La (A5)
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'triangle'
+      osc1.frequency.setValueAtTime(587.33, now)
+      gain1.gain.setValueAtTime(vol * 0.9, now)
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.45)
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+      osc1.start(now)
+      osc1.stop(now + 0.46)
 
-    // Note 2 : La (A5) 880.00 Hz
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.type = 'sine'
-    osc2.frequency.setValueAtTime(880.00, now + 0.1)
-    gain2.gain.setValueAtTime(vol * 1.0, now + 0.1)
-    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.75)
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.start(now + 0.1)
-    osc2.stop(now + 0.76)
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'sine'
+      osc2.frequency.setValueAtTime(880.00, now + 0.1)
+      gain2.gain.setValueAtTime(vol * 1.0, now + 0.1)
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.75)
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+      osc2.start(now + 0.1)
+      osc2.stop(now + 0.76)
+    }
 
     return true
   } catch (err) {
@@ -175,13 +258,20 @@ export async function playSynthesizedChime(volume = 0.8, deviceId = 'default') {
  * Joue le son de notification configuré pour un succès
  * Tente d'abord le décodage direct en mémoire PCM (Web Audio), puis HTML5 Audio persistant, puis carillon par défaut
  * @param {Object} themeData - { soundEnabled, soundVolume, audioPath, audioDeviceId }
+ * @param {String} tier - 'common' | 'rare' | 'master'
  */
-export async function playAchievementSound(themeData = {}) {
-  const isEnabled = themeData.soundEnabled ?? true
+export async function playAchievementSound(themeData = {}, tier = 'common') {
+  const isEnabled = themeData.soundEnabled ?? globalAudioSettings.soundEnabled ?? true
   if (!isEnabled) return
 
-  const volume = typeof themeData.soundVolume === 'number' ? themeData.soundVolume : 0.8
-  const deviceId = themeData.audioDeviceId || 'default'
+  const volume = typeof themeData.soundVolume === 'number'
+    ? themeData.soundVolume
+    : (globalAudioSettings.soundVolume ?? 0.8)
+
+  // Priorité au périphérique global si configuré et si le thème n'a pas surchargé
+  const deviceId = (themeData.audioDeviceId && themeData.audioDeviceId !== 'default')
+    ? themeData.audioDeviceId
+    : (globalAudioSettings.deviceId || 'default')
 
   // Si un fichier personnalisé est configuré
   let customAudioPath = themeData.audioPath
@@ -278,6 +368,6 @@ export async function playAchievementSound(themeData = {}) {
     }
   }
 
-  // --- ÉTAPE 3 : Fallback Carillon synthétisé par défaut ---
-  return await playSynthesizedChime(volume, deviceId)
+  // --- ÉTAPE 3 : Fallback Carillon synthétisé par défaut (adapté au tier standard, rare ou 100%) ---
+  return await playSynthesizedChime(volume, deviceId, tier)
 }

@@ -55,26 +55,48 @@
         </div>
       </div>
 
-      <!-- Bouton principal : Tester la notification -->
+      <!-- Boutons de test : simulation pour chaque Tier -->
       <div class="header-actions">
-        <button
-          id="btn-test-notification"
-          class="btn-test-primary"
-          :disabled="isTesting"
-          title="Tester sur l'écran et sur OBS"
-          @click="triggerTestNotification"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" class="btn-play-icon">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <span>{{ isTesting ? 'Diffusion...' : 'Tester' }}</span>
-        </button>
+        <div class="tier-test-btn-group">
+          <button
+            class="btn-tier-test common"
+            :disabled="isTesting"
+            title="Tester le rendu d'un succès standard (> 10%)"
+            @click="triggerTierTest('common')"
+          >
+            <span>🏅 Standard</span>
+          </button>
+          <button
+            class="btn-tier-test rare"
+            :disabled="isTesting"
+            title="Tester le rendu d'un succès rare (< 10%)"
+            @click="triggerTierTest('rare')"
+          >
+            <span>★ Rare</span>
+          </button>
+          <button
+            class="btn-tier-test master"
+            :disabled="isTesting"
+            title="Tester le rendu du 100% Jeu Complété (Platine)"
+            @click="triggerTierTest('master')"
+          >
+            <span>🏆 Platine 100%</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Barre d'onglets pour basculer entre HTML, CSS, Audio et Aperçu -->
+    <!-- Barre d'onglets pour basculer entre Effets, HTML, CSS, Audio et Aperçu -->
     <div class="editor-tabs-bar">
       <div class="tabs-group">
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'effects' }"
+          @click="activeTab = 'effects'"
+        >
+          <span>✨ Effets & Tiers</span>
+          <span v-if="theme.visualEffect && theme.visualEffect !== 'none'" class="tab-badge fx-active">Actif</span>
+        </button>
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'html' }"
@@ -108,12 +130,109 @@
 
       <div class="theme-actions-inline">
         <span v-if="saveMessage" class="save-status-pill">{{ saveMessage }}</span>
+        <button class="btn-export-theme" title="Télécharger ce thème en fichier .json" @click="exportCurrentTheme">
+          💾 Exporter
+        </button>
         <button class="btn-reset" title="Restaurer le template d'origine" @click="resetToDefault">
           Réinitialiser
         </button>
         <button class="btn-save" :disabled="isSaving" @click="saveCustomization">
           {{ isSaving ? 'Enregistrement...' : 'Sauvegarder' }}
         </button>
+      </div>
+    </div>
+
+    <!-- 0. Onglet Effets Visuels & Tiers (Scintillements, Particules et Rareté) -->
+    <div v-show="activeTab === 'effects'" class="tab-pane">
+      <div class="effects-config-card">
+        <!-- Section A : Effets Visuels Pré-faits -->
+        <div class="effects-section">
+          <div class="section-title-row">
+            <div>
+              <h3 class="section-title">Effet de Scintillement & Bordure</h3>
+              <p class="section-desc">Choisissez une animation visuelle pré-faite appliquée automatiquement autour de la carte et du cadre du succès.</p>
+            </div>
+            <span class="active-effect-pill">
+              Effet sélectionné : <strong>{{ currentEffectName }}</strong>
+            </span>
+          </div>
+
+          <div class="fx-options-grid">
+            <div
+              v-for="fx in visualEffectsList"
+              :key="fx.id"
+              class="fx-option-card"
+              :class="{ active: (theme.visualEffect || 'none') === fx.id }"
+              @click="selectVisualEffect(fx.id)"
+            >
+              <div class="fx-option-icon">{{ fx.icon }}</div>
+              <div class="fx-option-info">
+                <div class="fx-option-header">
+                  <h4 class="fx-option-name">{{ fx.name }}</h4>
+                  <span v-if="(theme.visualEffect || 'none') === fx.id" class="fx-check-dot">✓</span>
+                </div>
+                <p class="fx-option-desc">{{ fx.desc }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section B : Système de Rareté des Succès Steam (Tiers) -->
+        <div class="tiers-section">
+          <div class="section-title-row">
+            <div>
+              <h3 class="section-title">Niveaux de Succès Steam (Tiers)</h3>
+              <p class="section-desc">Steam différencie les succès ordinaires, les succès rares (&lt; 10%) et le grand final à 100%. Testez chaque alerte en un clic :</p>
+            </div>
+          </div>
+
+          <div class="tiers-cards-grid">
+            <!-- 1. Tier Standard -->
+            <div class="tier-card tier-card-common">
+              <div class="tier-card-header">
+                <span class="tier-icon">🏅</span>
+                <div>
+                  <h4 class="tier-title">Succès Standard (&gt; 10%)</h4>
+                  <span class="tier-badge-pill common">SUCCÈS DÉBLOQUÉ</span>
+                </div>
+              </div>
+              <p class="tier-desc">Succès commun débloqué par la majorité des joueurs. Style et teinte dorée classique Steam.</p>
+              <button class="btn-tier-action common" :disabled="isTesting" @click="triggerTierTest('common')">
+                ▶ Tester l'alerte Standard
+              </button>
+            </div>
+
+            <!-- 2. Tier Rare -->
+            <div class="tier-card tier-card-rare">
+              <div class="tier-card-header">
+                <span class="tier-icon">★</span>
+                <div>
+                  <h4 class="tier-title">Succès Rare (&lt; 10%)</h4>
+                  <span class="tier-badge-pill rare">★ SUCCÈS RARE (&lt; 10%)</span>
+                </div>
+              </div>
+              <p class="tier-desc">Débloqué par moins de 10% des joueurs mondiaux. Bordure et lueur améthyste avec arpège mystique.</p>
+              <button class="btn-tier-action rare" :disabled="isTesting" @click="triggerTierTest('rare')">
+                ▶ Tester l'alerte Rare
+              </button>
+            </div>
+
+            <!-- 3. Tier Platine 100% -->
+            <div class="tier-card tier-card-master">
+              <div class="tier-card-header">
+                <span class="tier-icon">🏆</span>
+                <div>
+                  <h4 class="tier-title">Jeu Complété (100% Platine)</h4>
+                  <span class="tier-badge-pill master">🏆 JEU COMPLÉTÉ (100%)</span>
+                </div>
+              </div>
+              <p class="tier-desc">Dernier succès validant 100% du jeu. Halo azur platine étincelant avec fanfare de victoire triomphante.</p>
+              <button class="btn-tier-action master" :disabled="isTesting" @click="triggerTierTest('master')">
+                ▶ Tester l'alerte 100% Platine
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -286,13 +405,42 @@
     <!-- 4. Onglet Aperçu en direct -->
     <div v-show="activeTab === 'preview'" class="tab-pane">
       <div class="preview-stage-container">
-        <!-- Style utilisateur injecté pour l'aperçu -->
+        <!-- Barre de sélection du tier pour l'aperçu -->
+        <div class="preview-tier-controls">
+          <span class="preview-tier-label">Rendu simulé selon le Tier Steam :</span>
+          <div class="tier-pill-selector">
+            <button
+              class="tier-pill-btn"
+              :class="{ active: selectedPreviewTier === 'common' }"
+              @click="selectedPreviewTier = 'common'"
+            >
+              🏅 Standard (> 10%)
+            </button>
+            <button
+              class="tier-pill-btn rare"
+              :class="{ active: selectedPreviewTier === 'rare' }"
+              @click="selectedPreviewTier = 'rare'"
+            >
+              ★ Rare (< 10%)
+            </button>
+            <button
+              class="tier-pill-btn master"
+              :class="{ active: selectedPreviewTier === 'master' }"
+              @click="selectedPreviewTier = 'master'"
+            >
+              🏆 Platine 100%
+            </button>
+          </div>
+        </div>
+
+        <!-- Style universel des effets et tiers + style du thème injecté -->
         <component :is="'style'">
+          {{ visualEffectsCss }}
           {{ theme.css || '' }}
         </component>
 
         <div class="preview-backdrop">
-          <div class="preview-watermark">Aperçu en direct</div>
+          <div class="preview-watermark">Aperçu en direct ({{ selectedPreviewTierName }})</div>
           <!-- Slot d'aperçu dynamique -->
           <div class="preview-slot" v-html="previewHtml"></div>
         </div>
@@ -305,6 +453,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { playAchievementSound, getAudioOutputDevices } from '../utils/soundPlayer.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
+import { VISUAL_EFFECTS, ACHIEVEMENT_TIERS, getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
+import { themeStorage } from '../services/themeStorage.js'
 
 const props = defineProps({
   targetTheme: {
@@ -319,7 +469,11 @@ const props = defineProps({
 
 const emit = defineEmits(['back', 'saved', 'activate'])
 
-const activeTab = ref('html')
+const visualEffectsList = VISUAL_EFFECTS
+const visualEffectsCss = getVisualEffectsCss()
+const selectedPreviewTier = ref('common')
+
+const activeTab = ref('effects')
 const isSaving = ref(false)
 const isTesting = ref(false)
 const isPlayingSound = ref(false)
@@ -331,6 +485,7 @@ const theme = ref({
   name: 'Nouveau Thème',
   html: '',
   css: '',
+  visualEffect: 'none',
   audioPath: null,
   audioDeviceId: 'default',
   soundEnabled: true,
@@ -348,6 +503,23 @@ const testData = {
   icon: 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 }
 
+const currentEffectName = computed(() => {
+  const found = visualEffectsList.find((e) => e.id === (theme.value.visualEffect || 'none'))
+  return found ? found.name : 'Aucun'
+})
+
+const selectedPreviewTierName = computed(() => {
+  return selectedPreviewTier.value === 'master'
+    ? '100% Platine'
+    : (selectedPreviewTier.value === 'rare' ? 'Succès Rare < 10%' : 'Succès Standard')
+})
+
+function selectVisualEffect(fxId) {
+  theme.value.visualEffect = fxId
+  saveCustomization()
+  showStatus(`Effet appliqué : ${currentEffectName.value} ✔`)
+}
+
 // Synchronise le thème édité dès que targetTheme change
 watch(
   () => props.targetTheme,
@@ -356,6 +528,7 @@ watch(
       theme.value = {
         ...DEFAULT_THEME,
         ...JSON.parse(JSON.stringify(newTheme)),
+        visualEffect: newTheme.visualEffect || 'none',
         audioDeviceId: newTheme.audioDeviceId || 'default'
       }
     }
@@ -363,14 +536,28 @@ watch(
   { immediate: true, deep: true }
 )
 
-// Calcul du HTML d'aperçu en direct
+// Calcul du HTML d'aperçu en direct avec effet visuel et tier
 const previewHtml = computed(() => {
   if (!theme.value.html) return '<div style="color: #8b9bb4; padding: 20px;">Aucun HTML défini.</div>'
-  return theme.value.html
-    .replace(/\{title\}/gi, testData.displayName)
-    .replace(/\{description\}/gi, testData.description)
-    .replace(/\{icon\}/gi, testData.icon)
-    .replace(/\{game\}/gi, testData.gameName)
+  const tierMeta = ACHIEVEMENT_TIERS[selectedPreviewTier.value] || ACHIEVEMENT_TIERS.common
+
+  let html = theme.value.html
+    .replace(/\{title\}/gi, tierMeta.defaultTitle)
+    .replace(/\{description\}/gi, tierMeta.defaultDesc)
+    .replace(/\{icon\}/gi, tierMeta.icon)
+    .replace(/\{game\}/gi, tierMeta.defaultGame)
+    .replace(/\{tier\}/gi, selectedPreviewTier.value)
+    .replace(/\{tierLabel\}/gi, tierMeta.defaultBadge)
+    .replace(/\{rarity\}/gi, tierMeta.defaultPercent + '%')
+
+  if (selectedPreviewTier.value !== 'common') {
+    html = html.replace(/SUCCÈS DÉBLOQUÉ/g, tierMeta.defaultBadge)
+  }
+
+  return enrichAchievementHtml(html, {
+    tier: selectedPreviewTier.value,
+    visualEffect: theme.value.visualEffect || 'none'
+  })
 })
 
 onMounted(async () => {
@@ -385,6 +572,7 @@ onMounted(async () => {
         theme.value = {
           ...DEFAULT_THEME,
           ...active,
+          visualEffect: active.visualEffect || 'none',
           audioDeviceId: active.audioDeviceId || 'default'
         }
       }
@@ -519,35 +707,43 @@ async function resetToDefault() {
   showStatus('Structure par défaut restaurée ✔')
 }
 
-// Déclenche le faux succès de test en utilisant LE CODE EN COURS D'ÉDITION pour la prévisualisation
-async function triggerTestNotification() {
+// Déclenche une simulation de succès selon le tier spécifié ('common', 'rare', 'master')
+async function triggerTierTest(tier = 'common') {
   if (isTesting.value) return
   isTesting.value = true
 
-  // 1. Jouer immédiatement le son du thème en cours d'édition dans l'application
+  const tierMeta = ACHIEVEMENT_TIERS[tier] || ACHIEVEMENT_TIERS.common
+
+  // 1. Jouer immédiatement le son avec la tonalité / carillon du Tier dans l'app
   playAchievementSound({
     soundEnabled: theme.value.soundEnabled,
     soundVolume: theme.value.soundVolume,
     audioPath: theme.value.audioPath,
     audioDeviceId: theme.value.audioDeviceId
-  })
+  }, tier)
 
-  // 2. Diffuser le test avec le thème en cours d'édition pour aperçu temporaire sur Desktop et OBS
+  // 2. Diffuser le test avec le thème en cours d'édition et les métadonnées du Tier
   try {
     if (window.steamAPI?.broadcastTestAchievement) {
       await window.steamAPI.broadcastTestAchievement({
-        ...testData,
+        displayName: tierMeta.defaultTitle,
+        description: tierMeta.defaultDesc,
+        gameName: tierMeta.defaultGame,
+        icon: tierMeta.icon,
+        tier: tier,
+        rarityPercent: tierMeta.defaultPercent,
         previewTheme: {
           id: theme.value.id,
           name: theme.value.name,
           html: theme.value.html,
           css: theme.value.css,
+          visualEffect: theme.value.visualEffect || 'none',
           audioPath: theme.value.audioPath,
           soundEnabled: theme.value.soundEnabled,
           soundVolume: theme.value.soundVolume
         }
       })
-      showStatus('Notification de test diffusée avec ce thème 🚀')
+      showStatus(`Alerte test (${tierMeta.name}) diffusée 🚀`)
     }
   } catch (err) {
     console.error('[CustomizationEditor] Erreur test notification:', err)
@@ -555,6 +751,25 @@ async function triggerTestNotification() {
     setTimeout(() => {
       isTesting.value = false
     }, 1500)
+  }
+}
+
+async function triggerTestNotification() {
+  await triggerTierTest('common')
+}
+
+// Exporte ce thème en fichier JSON téléchargeable
+async function exportCurrentTheme() {
+  if (!theme.value.id) return
+  try {
+    const res = await themeStorage.exportTheme(theme.value.id)
+    if (res.success) {
+      showStatus(`Thème exporté dans ${res.fileName} 💾`)
+    } else {
+      showStatus(res.error || 'Erreur lors de l\'export ✖')
+    }
+  } catch (err) {
+    showStatus('Erreur export: ' + err.message)
   }
 }
 
@@ -1299,5 +1514,404 @@ input:checked + .slider::before {
   height: 100%;
   position: relative;
   pointer-events: none;
+}
+
+/* Boutons de test de simulation par Tier */
+.tier-test-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-tier-test {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-tier-test.common {
+  background: rgba(240, 195, 48, 0.12);
+  border-color: rgba(240, 195, 48, 0.35);
+  color: #ffd644;
+}
+
+.btn-tier-test.common:hover:not(:disabled) {
+  background: rgba(240, 195, 48, 0.25);
+  border-color: rgba(240, 195, 48, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(240, 195, 48, 0.2);
+}
+
+.btn-tier-test.rare {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+.btn-tier-test.rare:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.28);
+  border-color: rgba(168, 85, 247, 0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+}
+
+.btn-tier-test.master {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+}
+
+.btn-tier-test.master:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.28);
+  border-color: rgba(56, 189, 248, 0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
+.btn-tier-test:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Badge dans l'onglet */
+.tab-badge.fx-active {
+  background: #f0c330;
+  color: #0d121a;
+  font-weight: 800;
+}
+
+/* Bouton export thème */
+.btn-export-theme {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #c5d4e8;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-export-theme:hover {
+  background: rgba(102, 192, 244, 0.15);
+  border-color: rgba(102, 192, 244, 0.45);
+  color: #66c0f4;
+  transform: translateY(-1px);
+}
+
+/* Onglet Effets & Tiers */
+.effects-config-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.effects-section,
+.tiers-section {
+  background: rgba(12, 18, 26, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.section-desc {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.78rem;
+  color: #8b9bb4;
+  line-height: 1.4;
+}
+
+.active-effect-pill {
+  font-size: 0.75rem;
+  background: rgba(240, 195, 48, 0.12);
+  border: 1px solid rgba(240, 195, 48, 0.35);
+  color: #f0c330;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Grille des effets */
+.fx-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.fx-option-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.fx-option-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.fx-option-card.active {
+  background: rgba(240, 195, 48, 0.1);
+  border-color: #f0c330;
+  box-shadow: 0 0 16px rgba(240, 195, 48, 0.2);
+}
+
+.fx-option-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fx-option-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.fx-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fx-option-name {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #e5effa;
+}
+
+.fx-check-dot {
+  color: #f0c330;
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.fx-option-desc {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.72rem;
+  color: #8b9bb4;
+  line-height: 1.35;
+}
+
+/* Grille des Tiers */
+.tiers-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.tier-card {
+  border-radius: 10px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tier-card-common {
+  border-color: rgba(240, 195, 48, 0.3);
+  background: linear-gradient(180deg, rgba(240, 195, 48, 0.04) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.tier-card-rare {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.tier-card-master {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.tier-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tier-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.tier-title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tier-badge-pill {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.tier-badge-pill.common {
+  background: rgba(240, 195, 48, 0.15);
+  color: #f0c330;
+  border: 1px solid rgba(240, 195, 48, 0.4);
+}
+
+.tier-badge-pill.rare {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.5);
+}
+
+.tier-badge-pill.master {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+}
+
+.tier-desc {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #9ab0c9;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.btn-tier-action {
+  width: 100%;
+  padding: 0.55rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-tier-action.common {
+  background: rgba(240, 195, 48, 0.15);
+  border-color: rgba(240, 195, 48, 0.4);
+  color: #ffd644;
+}
+
+.btn-tier-action.common:hover:not(:disabled) {
+  background: rgba(240, 195, 48, 0.3);
+  box-shadow: 0 0 12px rgba(240, 195, 48, 0.25);
+}
+
+.btn-tier-action.rare {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.45);
+  color: #d8b4fe;
+}
+
+.btn-tier-action.rare:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.35);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+}
+
+.btn-tier-action.master {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+}
+
+.btn-tier-action.master:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+}
+
+/* Contrôles de simulation dans l'onglet Aperçu */
+.preview-tier-controls {
+  padding: 0.85rem 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.preview-tier-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9cb3ce;
+}
+
+.tier-pill-selector {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tier-pill-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #a4b4cc;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tier-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.tier-pill-btn.active {
+  background: rgba(240, 195, 48, 0.2);
+  border-color: #f0c330;
+  color: #f0c330;
+}
+
+.tier-pill-btn.rare.active {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: #a855f7;
+  color: #c084fc;
+}
+
+.tier-pill-btn.master.active {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #38bdf8;
 }
 </style>

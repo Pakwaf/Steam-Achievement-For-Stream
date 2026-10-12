@@ -30,6 +30,10 @@ pub struct Achievement {
     pub unlocked_at: String,
     #[serde(default)]
     pub is_test: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rarity_percent: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preview_theme: Option<serde_json::Value>,
 }
@@ -43,8 +47,12 @@ pub struct ThemeCustomization {
     pub name: Option<String>,
     pub html: String,
     pub css: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual_effect: Option<String>,
     #[serde(default)]
     pub audio_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_device_id: Option<String>,
     #[serde(default = "default_sound_enabled")]
     pub sound_enabled: bool,
     #[serde(default = "default_sound_volume")]
@@ -93,6 +101,8 @@ pub struct AppSettings {
     pub sound_enabled: bool,
     #[serde(default = "default_sound_volume")]
     pub sound_volume: f32,
+    #[serde(default)]
+    pub audio_device_id: Option<String>,
     #[serde(default = "default_desktop_overlay")]
     pub desktop_overlay_enabled: bool,
 }
@@ -111,6 +121,7 @@ impl Default for AppSettings {
             obs_port: 8080,
             sound_enabled: true,
             sound_volume: 0.8,
+            audio_device_id: None,
             desktop_overlay_enabled: true,
         }
     }

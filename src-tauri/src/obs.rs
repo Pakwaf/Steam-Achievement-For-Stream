@@ -284,6 +284,7 @@ impl ObsServer {
         let data = serde_json::json!({
             "html": theme.get("html").and_then(|v| v.as_str()).unwrap_or(DEFAULT_HTML),
             "css": theme.get("css").and_then(|v| v.as_str()).unwrap_or(DEFAULT_CSS),
+            "visualEffect": theme.get("visualEffect").and_then(|v| v.as_str()).unwrap_or("none"),
             "audioPath": theme.get("audioPath"),
             "hasAudio": has_audio,
             "audioUrl": if has_audio { Some("/audio/custom") } else { None },
@@ -518,6 +519,11 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         .and_then(|v| v.as_f64())
         .unwrap_or(0.8);
 
+    let visual_effect = theme
+        .get("visualEffect")
+        .and_then(|v| v.as_str())
+        .unwrap_or("none");
+
     let html_content = format!(
         r#"<!DOCTYPE html>
 <html lang="fr">
@@ -588,6 +594,154 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       pointer-events: none;
       overflow: hidden;
     }}
+
+    /* Calque universel pour les effets visuels */
+    .theme-effect-layer {{
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      overflow: hidden;
+      z-index: 10;
+    }}
+
+    /* 1. Étoiles Scintillantes */
+    .fx-stars .theme-effect-layer::before,
+    .fx-stars .theme-effect-layer::after {{
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: 
+        radial-gradient(2px 2px at 15% 25%, #fff, rgba(255, 255, 255, 0)),
+        radial-gradient(3px 3px at 45% 15%, #ffd700, rgba(255, 215, 0, 0)),
+        radial-gradient(2.5px 2.5px at 75% 35%, #fff, rgba(255, 255, 255, 0)),
+        radial-gradient(2px 2px at 25% 75%, #ffdb65, rgba(255, 219, 101, 0)),
+        radial-gradient(3px 3px at 65% 85%, #fff, rgba(255, 255, 255, 0)),
+        radial-gradient(2px 2px at 85% 65%, #ffd700, rgba(255, 215, 0, 0));
+      animation: fx-obs-sparkle 2.2s infinite ease-in-out alternate;
+    }}
+    .fx-stars .theme-effect-layer::after {{
+      animation-delay: -1.1s;
+      transform: rotate(180deg);
+    }}
+    @keyframes fx-obs-sparkle {{
+      0% {{ opacity: 0.2; transform: scale(0.96); }}
+      50% {{ opacity: 0.95; transform: scale(1.02); filter: drop-shadow(0 0 6px #ffd700); }}
+      100% {{ opacity: 0.3; transform: scale(0.98); }}
+    }}
+
+    /* 2. Contour Néon */
+    .fx-neon-contour {{
+      position: relative;
+    }}
+    .fx-neon-contour .theme-effect-layer::before {{
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      padding: 2px;
+      background: conic-gradient(from 0deg, #f0c330, #ff6b6b, #4facfe, #00f2fe, #f0c330);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: fx-obs-neon-spin 3.5s linear infinite;
+      filter: drop-shadow(0 0 8px rgba(240, 195, 48, 0.6));
+    }}
+    @keyframes fx-obs-neon-spin {{
+      0% {{ filter: hue-rotate(0deg) drop-shadow(0 0 8px rgba(240, 195, 48, 0.6)); }}
+      100% {{ filter: hue-rotate(360deg) drop-shadow(0 0 8px rgba(240, 195, 48, 0.6)); }}
+    }}
+
+    /* 3. Shimmer Doré Balayant */
+    .fx-golden-shimmer .theme-effect-layer::after {{
+      content: '';
+      position: absolute;
+      top: -60%;
+      left: -60%;
+      width: 220%;
+      height: 220%;
+      background: linear-gradient(
+        115deg,
+        transparent 25%,
+        rgba(255, 235, 140, 0.05) 42%,
+        rgba(255, 245, 180, 0.45) 48%,
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(255, 245, 180, 0.45) 52%,
+        rgba(255, 235, 140, 0.05) 58%,
+        transparent 75%
+      );
+      transform: rotate(25deg);
+      animation: fx-obs-shimmer 3.2s infinite ease-in-out;
+    }}
+    @keyframes fx-obs-shimmer {{
+      0% {{ transform: translateX(-150%) rotate(25deg); }}
+      35%, 100% {{ transform: translateX(150%) rotate(25deg); }}
+    }}
+
+    /* 4. Braises Flottantes */
+    .fx-embers .theme-effect-layer::before {{
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: 
+        radial-gradient(2px 2px at 20% 80%, #ff5722, transparent),
+        radial-gradient(3px 3px at 50% 90%, #ff9800, transparent),
+        radial-gradient(2.5px 2.5px at 80% 85%, #ff3d00, transparent),
+        radial-gradient(2px 2px at 30% 60%, #ffc107, transparent);
+      animation: fx-obs-embers 2.5s infinite linear;
+    }}
+    @keyframes fx-obs-embers {{
+      0% {{ transform: translateY(10px); opacity: 0; }}
+      50% {{ opacity: 0.9; }}
+      100% {{ transform: translateY(-20px); opacity: 0; }}
+    }}
+
+    /* 5. Aura Cybernétique */
+    .fx-cyber-glitch .theme-effect-layer::before {{
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 24px rgba(0, 242, 254, 0.4), 0 0 20px rgba(0, 242, 254, 0.3);
+      animation: fx-obs-cyber 2s infinite alternate ease-in-out;
+    }}
+    @keyframes fx-obs-cyber {{
+      0% {{ opacity: 0.3; }}
+      100% {{ opacity: 0.95; }}
+    }}
+
+    /* Tier Rare (< 10%) */
+    .tier-rare {{
+      border-color: rgba(168, 85, 247, 0.8) !important;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85), 0 0 36px rgba(168, 85, 247, 0.35) !important;
+    }}
+    .tier-rare .unlock-tag {{
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(139, 92, 246, 0.25) 100%) !important;
+      color: #c084fc !important;
+      border-color: rgba(168, 85, 247, 0.6) !important;
+      font-weight: 800 !important;
+    }}
+    .tier-rare .icon-container {{
+      border-color: #a855f7 !important;
+      box-shadow: 0 0 18px rgba(168, 85, 247, 0.55) !important;
+    }}
+
+    /* Tier Master (100% Platine) */
+    .tier-master {{
+      border-color: rgba(56, 189, 248, 0.9) !important;
+      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.9), 0 0 45px rgba(56, 189, 248, 0.5) !important;
+    }}
+    .tier-master .unlock-tag {{
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%) !important;
+      color: #ffffff !important;
+      border-color: rgba(255, 255, 255, 0.6) !important;
+      font-weight: 800 !important;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.7) !important;
+    }}
+    .tier-master .icon-container {{
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.75) !important;
+    }}
   </style>
   <style id="custom-theme-css">
 {css}
@@ -611,6 +765,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
     const customCssElem = document.getElementById('custom-theme-css');
 
     let currentHtmlTemplate = {html_template_json};
+    let currentVisualEffect = {visual_effect_json};
     let soundSettings = {{
       hasAudio: {has_audio},
       audioUrl: {has_audio} ? '/audio/custom?_v=' + Date.now() : null,
@@ -631,42 +786,112 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
 
     function renderCustomHtml(template, item) {{
       if (!template) return '';
-      return template
+      const tier = item.tier || 'common';
+      const defaultBadge = tier === 'master' 
+        ? '🏆 JEU COMPLÉTÉ (100%)' 
+        : (tier === 'rare' ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ');
+      const rarityText = item.rarityPercent ? (item.rarityPercent + '%') : (tier === 'rare' ? '4.8%' : '42.5%');
+
+      let html = template
         .replace(/\{{title\}}/gi, escapeHtml(item.displayName || 'Succès Débloqué'))
         .replace(/\{{description\}}/gi, escapeHtml(item.description || ''))
         .replace(/\{{icon\}}/gi, item.icon || fallbackIcon)
-        .replace(/\{{game\}}/gi, escapeHtml(item.gameName || 'Steam'));
+        .replace(/\{{game\}}/gi, escapeHtml(item.gameName || 'Steam'))
+        .replace(/\{{tier\}}/gi, tier)
+        .replace(/\{{tierLabel\}}/gi, defaultBadge)
+        .replace(/\{{rarity\}}/gi, rarityText);
+
+      // Si le template contient "SUCCÈS DÉBLOQUÉ" et qu'on est sur un tier supérieur
+      if (tier !== 'common') {{
+        html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge);
+      }}
+
+      // Injection de la couche d'effet visuel
+      if (currentVisualEffect && currentVisualEffect !== 'none' && !html.includes('theme-effect-layer')) {{
+        html = html.replace(/(<div[^>]*class=["'][^"']*card[^"']*["'][^>]*>)/i, '$1<div class="theme-effect-layer"></div>');
+      }}
+
+      // Ajout des classes de tier et fx sur le premier conteneur
+      const tierClass = 'tier-' + tier;
+      const fxClass = (currentVisualEffect && currentVisualEffect !== 'none') ? ('fx-' + currentVisualEffect.replace(/_/g, '-')) : '';
+      html = html.replace(/(class=["'])/i, '$1' + tierClass + ' ' + fxClass + ' ');
+
+      return html;
     }}
 
-    function playNotificationSound() {{
+    function playNotificationSound(tier) {{
       if (!soundSettings.soundEnabled) return;
       if (soundSettings.hasAudio && soundSettings.audioUrl) {{
         try {{
           const audio = new Audio(soundSettings.audioUrl);
           audio.volume = soundSettings.soundVolume;
-          audio.play().catch(function() {{ playChimeFallback(); }});
+          audio.play().catch(function() {{ playChimeFallback(tier); }});
           return;
         }} catch(e) {{}}
       }}
-      playChimeFallback();
+      playChimeFallback(tier);
     }}
 
-    function playChimeFallback() {{
+    function playChimeFallback(tier) {{
       try {{
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return;
         const ctx = new AudioCtx();
         const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, now);
-        gain.gain.setValueAtTime(0.08 * soundSettings.soundVolume, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.55);
+        const vol = 0.08 * soundSettings.soundVolume;
+
+        if (tier === 'master') {{
+          // Fanfare triomphante Platine
+          const notes = [
+            {{ f: 523.25, t: 0.00, dur: 0.35, v: 0.8 }},
+            {{ f: 659.25, t: 0.12, dur: 0.40, v: 0.85 }},
+            {{ f: 783.99, t: 0.24, dur: 0.45, v: 0.9 }},
+            {{ f: 1046.50, t: 0.36, dur: 0.90, v: 1.2 }}
+          ];
+          notes.forEach(function(n) {{
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = n.f > 800 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(n.f, now + n.t);
+            gain.gain.setValueAtTime(vol * n.v, now + n.t);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + n.t);
+            osc.stop(now + n.t + n.dur + 0.05);
+          }});
+        }} else if (tier === 'rare') {{
+          // Arpège mystique Rare
+          const notes = [
+            {{ f: 659.25, t: 0.00, dur: 0.40, v: 0.85 }},
+            {{ f: 830.61, t: 0.11, dur: 0.45, v: 0.95 }},
+            {{ f: 1046.50, t: 0.22, dur: 0.75, v: 1.1 }}
+          ];
+          notes.forEach(function(n) {{
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(n.f, now + n.t);
+            gain.gain.setValueAtTime(vol * n.v, now + n.t);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + n.t);
+            osc.stop(now + n.t + n.dur + 0.05);
+          }});
+        }} else {{
+          // Standard : D5 + A5
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now);
+          gain.gain.setValueAtTime(vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.55);
+        }}
       }} catch(e) {{}}
     }}
 
@@ -674,7 +899,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       if (toastTimeout) clearTimeout(toastTimeout);
       if (leaveTimeout) clearTimeout(leaveTimeout);
 
-      playNotificationSound();
+      const tier = item.tier || 'common';
+      playNotificationSound(tier);
       achSlot.innerHTML = renderCustomHtml(currentHtmlTemplate, item);
 
       const card = achSlot.firstElementChild;
@@ -712,6 +938,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
           if (msg.type === 'CUSTOMIZATION_UPDATED' && msg.data) {{
             if (msg.data.css) customCssElem.textContent = msg.data.css;
             if (msg.data.html) currentHtmlTemplate = msg.data.html;
+            if (msg.data.visualEffect !== undefined) currentVisualEffect = msg.data.visualEffect;
             soundSettings = {{
               hasAudio: Boolean(msg.data.hasAudio),
               audioUrl: msg.data.hasAudio ? '/audio/custom?_v=' + Date.now() : null,
@@ -738,6 +965,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
 </html>"#,
         css = css,
         html_template_json = serde_json::to_string(html_template).unwrap_or_default(),
+        visual_effect_json = serde_json::to_string(visual_effect).unwrap_or_default(),
         has_audio = has_audio,
         sound_enabled = sound_enabled,
         sound_volume = sound_volume

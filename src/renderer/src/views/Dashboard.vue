@@ -56,6 +56,14 @@
           <span class="status-dot" :class="{ online: currentUser, offline: !currentUser }"></span>
           <span class="status-label">{{ currentUser ? currentUser.personaName : 'Déconnecté' }}</span>
         </div>
+        <!-- Bouton Paramètres Généraux (Audio global, Port OBS, Overlay) -->
+        <button class="btn-header-settings" title="Paramètres généraux de l'application" @click="openGeneralSettingsModal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="settings-gear-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>Paramètres</span>
+        </button>
       </div>
     </header>
 
@@ -401,28 +409,45 @@
           />
         </div>
 
-        <div v-else class="library-section-card">
-          <div class="library-header">
+        <div v-else class="library-section-card studio-theme-library">
+          <!-- Input caché pour l'import de fichier thème .json -->
+          <input
+            ref="themeFileInput"
+            type="file"
+            accept=".json"
+            style="display: none;"
+            @change="handleThemeFileImport"
+          />
+
+          <!-- En-tête Studio -->
+          <div class="library-header studio-header">
             <div class="library-title-group">
-              <div class="library-icon-glow">
+              <div class="library-icon-glow studio-glow">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="lib-icon">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 00-2.25 2.25v6" />
                 </svg>
               </div>
               <div>
                 <div class="title-with-pill">
-                  <h3>Bibliothèque de Thèmes</h3>
-                  <span class="theme-count-pill">{{ themeLibrary.themes.length }}</span>
+                  <h3>Studio & Galerie de Thèmes</h3>
+                  <span class="theme-count-pill">{{ filteredThemes.length }} / {{ themeLibrary.themes.length }}</span>
                 </div>
-                <p class="subtitle">Sélectionnez le thème actif pour vos streams ou personnalisez vos designs</p>
+                <p class="subtitle">Gérez vos overlays, exportez/importez vos créations et prévisualisez vos animations</p>
               </div>
             </div>
 
-            <div class="library-header-actions">
+            <!-- Boutons d'actions principaux de la bibliothèque -->
+            <div class="library-header-actions studio-actions">
               <span v-if="libraryStatusMessage" class="lib-status-toast">{{ libraryStatusMessage }}</span>
-              <button class="btn-restore-themes" title="Restaurer les thèmes officiels par défaut (Pokemon, Cozy, Horror, etc.)" @click="handleRestoreDefaultThemes">
+              <button class="btn-import-theme" title="Importer un thème depuis un fichier .json" @click="triggerImportClick">
+                <span>📥 Importer</span>
+              </button>
+              <button class="btn-export-all" title="Exporter tous vos thèmes dans une sauvegarde JSON" @click="handleExportLibrary">
+                <span>📤 Sauvegarder tout</span>
+              </button>
+              <button class="btn-restore-themes" title="Restaurer les thèmes officiels (Steam Gold, Cozy, Horror, Dark Fantasy, Frutiger Aero)" @click="handleRestoreDefaultThemes">
                 <span class="restore-icon">↺</span>
-                <span>Restaurer par défaut</span>
+                <span>Restaurer</span>
               </button>
               <button class="btn-create-theme" title="Créer un nouveau thème" @click="handleCreateNewTheme">
                 <span class="plus-icon">+</span>
@@ -431,45 +456,119 @@
             </div>
           </div>
 
-          <!-- Grille de Cartes Modulaires -->
-          <div class="themes-grid">
+          <!-- Barre d'outils et de filtres Studio -->
+          <div class="studio-filter-toolbar">
+            <div class="studio-search-box">
+              <span class="search-icon">🔍</span>
+              <input
+                v-model="themeSearchQuery"
+                type="text"
+                class="studio-search-input"
+                placeholder="Rechercher un thème par nom..."
+              />
+              <button
+                v-if="themeSearchQuery"
+                class="btn-clear-search"
+                title="Effacer"
+                @click="themeSearchQuery = ''"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="studio-filter-chips">
+              <button
+                class="filter-chip"
+                :class="{ active: themeFilter === 'all' }"
+                @click="themeFilter = 'all'"
+              >
+                Tous ({{ themeLibrary.themes.length }})
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: themeFilter === 'active' }"
+                @click="themeFilter = 'active'"
+              >
+                ★ Thème Actif
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: themeFilter === 'fx' }"
+                @click="themeFilter = 'fx'"
+              >
+                ✨ Avec Scintillement
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: themeFilter === 'audio' }"
+                @click="themeFilter = 'audio'"
+              >
+                🎵 Son Personnalisé
+              </button>
+            </div>
+          </div>
+
+          <!-- État si aucun thème ne correspond au filtre/recherche -->
+          <div v-if="filteredThemes.length === 0" class="studio-empty-state">
+            <div class="empty-icon">🎨</div>
+            <h4>Aucun thème ne correspond à votre recherche</h4>
+            <p>Essayez de modifier vos filtres ou créez un nouveau design en un clic.</p>
+            <button class="btn-secondary" @click="themeSearchQuery = ''; themeFilter = 'all'">
+              Réinitialiser les filtres
+            </button>
+          </div>
+
+          <!-- Grille de Cartes Studio Haut de Gamme -->
+          <div v-else class="themes-grid studio-grid">
             <div
-              v-for="thm in themeLibrary.themes"
+              v-for="thm in filteredThemes"
               :key="thm.id"
-              class="theme-card"
+              class="theme-card studio-card"
               :class="{ 'is-active-theme': thm.id === themeLibrary.activeThemeId }"
             >
-              <!-- En-tête de la carte avec statut actif -->
-              <div class="card-status-bar">
-                <div v-if="thm.id === themeLibrary.activeThemeId" class="active-badge">
-                  <span class="active-sparkle">★</span>
-                  <span>Actif</span>
+              <!-- En-tête de la carte : Statut Live & Badges visuels -->
+              <div class="card-status-bar studio-card-header">
+                <div v-if="thm.id === themeLibrary.activeThemeId" class="active-badge studio-active-badge">
+                  <span class="active-sparkle pulse">★</span>
+                  <span>EN LIVE</span>
                 </div>
-                <div v-else></div>
+                <div v-else class="inactive-badge-pill">
+                  <span>Prêt</span>
+                </div>
 
-                <div class="card-audio-indicator" :title="thm.audioPath || 'Son standard par défaut'">
-                  <span v-if="thm.audioPath" class="audio-chip custom">🎵 Son perso</span>
-                  <span v-else class="audio-chip default">🔔 Standard</span>
+                <!-- Badges de caractéristiques -->
+                <div class="card-badges-row">
+                  <span v-if="thm.visualEffect && thm.visualEffect !== 'none'" class="effect-badge-pill" :title="`Effet visuel : ${getEffectLabel(thm.visualEffect)}`">
+                    ✨ {{ getEffectLabel(thm.visualEffect) }}
+                  </span>
+                  <span v-if="thm.audioPath" class="audio-chip custom" title="Fichier audio personnalisé configuré">
+                    🎵 Son perso
+                  </span>
+                  <span v-else class="audio-chip default" title="Carillon sonore par défaut">
+                    🔔 Standard
+                  </span>
                 </div>
               </div>
 
               <!-- Informations sur le thème -->
-              <div class="card-main-info">
+              <div class="card-main-info studio-info">
                 <h4 class="theme-card-title">{{ thm.name }}</h4>
                 <span class="theme-id-sub">{{ thm.id }}</span>
               </div>
 
-              <!-- Rendu Visuel Réel (HTML & CSS du thème en direct) -->
-              <ThemeCardPreview :html="thm.html" :css="thm.css" />
+              <!-- Rendu Visuel Réel dans un cadre Studio -->
+              <div class="studio-preview-frame">
+                <ThemeCardPreview :html="thm.html" :css="thm.css" />
+              </div>
 
-              <!-- Actions sur la carte -->
-              <div class="card-actions-toolbar">
+              <!-- Actions Studio sur la carte -->
+              <div class="card-actions-toolbar studio-actions-bar">
                 <!-- Bouton Activer -->
                 <button
                   class="btn-card-action btn-activate"
                   :class="{ 'already-active': thm.id === themeLibrary.activeThemeId }"
                   :disabled="thm.id === themeLibrary.activeThemeId"
-                  title="Activer ce thème pour les overlays"
+                  :title="thm.id === themeLibrary.activeThemeId ? 'Thème actuellement actif sur l\'overlay' : 'Activer pour l\'écran et OBS'"
                   @click="handleActivateTheme(thm.id)"
                 >
                   <span v-if="thm.id === themeLibrary.activeThemeId">✓ Actif</span>
@@ -479,10 +578,19 @@
                 <!-- Bouton Éditer -->
                 <button
                   class="btn-card-action btn-edit"
-                  title="Modifier le code et le style de ce thème"
+                  title="Modifier le code HTML, CSS, effets et audio"
                   @click="handleEditTheme(thm)"
                 >
-                  Éditer
+                  <span>✏️ Éditer</span>
+                </button>
+
+                <!-- Bouton Exporter -->
+                <button
+                  class="btn-card-action btn-export"
+                  title="Télécharger ce thème individuel (.json)"
+                  @click="handleExportTheme(thm.id)"
+                >
+                  <span>💾 Exporter</span>
                 </button>
 
                 <!-- Bouton Dupliquer -->
@@ -491,17 +599,17 @@
                   title="Créer une copie exacte de ce thème"
                   @click="handleDuplicateTheme(thm.id)"
                 >
-                  Dupliquer
+                  <span>📑 Dupliquer</span>
                 </button>
 
                 <!-- Bouton Supprimer -->
                 <button
                   class="btn-card-action btn-delete"
                   :disabled="themeLibrary.themes.length <= 1"
-                  :title="themeLibrary.themes.length <= 1 ? 'Impossible de supprimer le seul thème restant' : 'Supprimer'"
+                  :title="themeLibrary.themes.length <= 1 ? 'Impossible de supprimer le seul thème restant' : 'Supprimer définitivement'"
                   @click="handleDeleteTheme(thm)"
                 >
-                  Supprimer
+                  <span>🗑️</span>
                 </button>
               </div>
             </div>
@@ -548,40 +656,58 @@
             </div>
           </div>
 
-          <!-- Section de Test & Simulation -->
+          <!-- Section de Test & Simulation par Tier -->
           <div class="simulation-section">
             <div class="simulation-header">
-              <h4>Tester les Overlays</h4>
-              <p>Simulez le déblocage d'un succès pour valider l'affichage sur votre écran et sur OBS :</p>
+              <div class="sim-title-group">
+                <h4>Tester les Niveaux de Rareté (Tiers Steam)</h4>
+                <span class="sim-badge">3 Tiers Disponibles</span>
+              </div>
+              <p>Simulez chaque niveau de rareté pour valider l'affichage visuel, le badge, et la signature sonore sur votre écran et OBS :</p>
             </div>
 
-            <div class="sim-buttons-row">
-              <button
-                class="btn-sim"
-                :disabled="isSimulating"
-                @click="simulateAchievement('440', 'TF_PLAY_GAME_EVERYCLASS')"
-              >
-                <span class="sim-game-badge">TF2</span>
-                <span>Tête de classe</span>
-              </button>
+            <div class="sim-tiers-grid">
+              <!-- Tier 1 : Standard -->
+              <div class="sim-tier-card common">
+                <div class="sim-tier-badge">🏅 Standard (&gt; 10%)</div>
+                <div class="sim-tier-name">Tête de classe</div>
+                <div class="sim-tier-game">Team Fortress 2 (42.5%)</div>
+                <button
+                  class="btn-sim-action common"
+                  :disabled="isSimulating"
+                  @click="triggerDashboardTierTest('common')"
+                >
+                  ▶ Tester Standard
+                </button>
+              </div>
 
-              <button
-                class="btn-sim"
-                :disabled="isSimulating"
-                @click="simulateAchievement('1794680', 'ReachLV5')"
-              >
-                <span class="sim-game-badge">Vampire Survivors</span>
-                <span>Ailes (LV5)</span>
-              </button>
+              <!-- Tier 2 : Rare -->
+              <div class="sim-tier-card rare">
+                <div class="sim-tier-badge">★ Rare (&lt; 10%)</div>
+                <div class="sim-tier-name">Guerre frontale</div>
+                <div class="sim-tier-game">Left 4 Dead 2 (4.8%)</div>
+                <button
+                  class="btn-sim-action rare"
+                  :disabled="isSimulating"
+                  @click="triggerDashboardTierTest('rare')"
+                >
+                  ▶ Tester Rare (&lt; 10%)
+                </button>
+              </div>
 
-              <button
-                class="btn-sim"
-                :disabled="isSimulating"
-                @click="simulateAchievement('550', 'ACH_FINISH_CAMPAIGN_MELEE_ONLY')"
-              >
-                <span class="sim-game-badge">Left 4 Dead 2</span>
-                <span>Guerre frontale</span>
-              </button>
+              <!-- Tier 3 : 100% Platine -->
+              <div class="sim-tier-card master">
+                <div class="sim-tier-badge">🏆 Jeu Complété (100%)</div>
+                <div class="sim-tier-name">Maître Incontesté</div>
+                <div class="sim-tier-game">100% Tous les succès</div>
+                <button
+                  class="btn-sim-action master"
+                  :disabled="isSimulating"
+                  @click="triggerDashboardTierTest('master')"
+                >
+                  ▶ Tester 100% Platine
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -718,15 +844,134 @@
           </div>
         </div>
       </div>
+
+      <!-- Modal Paramètres Généraux (Sortie audio globale, Port OBS, etc.) -->
+      <div v-if="showGeneralSettingsModal" class="api-key-modal-overlay" @click.self="closeGeneralSettingsModal">
+        <div class="api-key-modal-card general-settings-modal">
+          <div class="modal-card-header">
+            <div class="modal-title-group">
+              <span class="modal-key-icon">⚙️</span>
+              <div>
+                <h3>Paramètres Généraux de l'Application</h3>
+                <p class="modal-subtitle-text">Gérez la sortie audio globale Windows, les volumes et vos flux OBS</p>
+              </div>
+            </div>
+            <button class="btn-close-modal" title="Fermer" @click="closeGeneralSettingsModal">✕</button>
+          </div>
+
+          <div class="general-settings-body">
+            <!-- 1. Sortie audio globale Windows -->
+            <div class="settings-block">
+              <div class="block-header-row">
+                <span class="block-icon">🎧</span>
+                <div>
+                  <h4 class="block-title">Sortie Audio Globale (Windows)</h4>
+                  <p class="block-sub">Règle le périphérique de sortie audio par défaut pour toutes vos alertes (ex : Elgato Wave Link SFX, Casque, Enceintes)</p>
+                </div>
+              </div>
+
+              <div class="settings-field-row">
+                <select
+                  v-model="globalAudioSettings.deviceId"
+                  class="device-select-global"
+                >
+                  <option v-for="dev in audioDevicesList" :key="dev.deviceId" :value="dev.deviceId">
+                    {{ dev.label }}
+                  </option>
+                </select>
+                <button class="btn-test-global-audio" :disabled="isPlayingGlobalTest" @click="testGlobalAudioOutput">
+                  {{ isPlayingGlobalTest ? '🔊 Lecture...' : '▶ Tester la sortie' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Volume sonore global et statut -->
+            <div class="settings-block">
+              <div class="block-header-row">
+                <span class="block-icon">🔊</span>
+                <div>
+                  <h4 class="block-title">Volume et Lecture Sonore Globale</h4>
+                  <p class="block-sub">Contrôlez l'activation et le volume général de notification des succès</p>
+                </div>
+              </div>
+
+              <div class="settings-volume-controls">
+                <label class="toggle-switch">
+                  <input v-model="globalAudioSettings.soundEnabled" type="checkbox" />
+                  <span class="slider"></span>
+                  <span class="toggle-text">{{ globalAudioSettings.soundEnabled ? 'Sons Activés' : 'Mode Muet' }}</span>
+                </label>
+
+                <div class="global-volume-slider-box">
+                  <span class="volume-pct">{{ Math.round(globalAudioSettings.soundVolume * 100) }}%</span>
+                  <input
+                    v-model.number="globalAudioSettings.soundVolume"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    class="range-slider"
+                    :disabled="!globalAudioSettings.soundEnabled"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Port OBS et Réseau -->
+            <div class="settings-block">
+              <div class="block-header-row">
+                <span class="block-icon">🔌</span>
+                <div>
+                  <h4 class="block-title">Port du Serveur Local OBS</h4>
+                  <p class="block-sub">Port utilisé pour la source navigateur OBS (par défaut 8080, bascule automatique si Streamer.bot est actif)</p>
+                </div>
+              </div>
+
+              <div class="settings-field-row">
+                <input
+                  v-model.number="modalPortValue"
+                  type="number"
+                  min="1024"
+                  max="65535"
+                  class="key-text-input port-input"
+                  placeholder="8080"
+                />
+                <span class="port-status-badge" :class="{ conflict: obsStatus?.hasPortConflict }">
+                  Port actif : {{ obsStatus?.port || 8080 }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="generalSettingsMessage" class="success-banner">
+            <span>{{ generalSettingsMessage }}</span>
+          </div>
+
+          <div class="modal-actions-footer">
+            <button class="btn-secondary" @click="closeGeneralSettingsModal">Fermer</button>
+            <button class="btn-save-modal-key" @click="saveGeneralSettings">
+              Enregistrer les Paramètres
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import CustomizationEditor from '../components/CustomizationEditor.vue'
 import ThemeCardPreview from '../components/ThemeCardPreview.vue'
-import { playAchievementSound } from '../utils/soundPlayer.js'
+import {
+  playAchievementSound,
+  playSynthesizedChime,
+  getAudioOutputDevices,
+  getGlobalAudioSettings,
+  setGlobalAudioSettings
+} from '../utils/soundPlayer.js'
+import { themeStorage } from '../services/themeStorage.js'
+import { VISUAL_EFFECTS, ACHIEVEMENT_TIERS } from '../utils/visualEffects.js'
 
 const isInitializing = ref(true)
 const currentUser = ref(null)
@@ -778,11 +1023,42 @@ const isSimulating = ref(false)
 let toastTimer = null
 let obsPollInterval = null
 
-// État de la Bibliothèque de Thèmes (Phase 5)
+// Paramètres généraux et Audio global
+const showGeneralSettingsModal = ref(false)
+const generalSettingsMessage = ref('')
+const isPlayingGlobalTest = ref(false)
+const audioDevicesList = ref([{ deviceId: 'default', label: 'Périphérique Windows par défaut' }])
+const globalAudioSettings = ref(getGlobalAudioSettings())
+
+// État de la Bibliothèque de Thèmes (Phase 5 & Studio)
 const currentView = ref('library') // 'library' | 'editor'
 const editingTheme = ref(null)
 const themeLibrary = ref({ activeThemeId: '', deletedThemeIds: [], themes: [] })
 const libraryStatusMessage = ref('')
+const themeSearchQuery = ref('')
+const themeFilter = ref('all') // 'all' | 'active' | 'fx' | 'audio'
+const themeFileInput = ref(null)
+
+const filteredThemes = computed(() => {
+  let list = themeLibrary.value.themes || []
+  if (themeSearchQuery.value && themeSearchQuery.value.trim()) {
+    const q = themeSearchQuery.value.toLowerCase().trim()
+    list = list.filter((t) => (t.name || '').toLowerCase().includes(q))
+  }
+  if (themeFilter.value === 'active') {
+    list = list.filter((t) => t.id === themeLibrary.value.activeThemeId)
+  } else if (themeFilter.value === 'fx') {
+    list = list.filter((t) => t.visualEffect && t.visualEffect !== 'none')
+  } else if (themeFilter.value === 'audio') {
+    list = list.filter((t) => Boolean(t.audioPath))
+  }
+  return list
+})
+
+function getEffectLabel(effectId) {
+  const found = VISUAL_EFFECTS.find((e) => e.id === effectId)
+  return found ? found.name : 'Aucun'
+}
 
 const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
@@ -1001,20 +1277,191 @@ async function handleDeleteTheme(theme) {
   }
 }
 
-// Restaure tous les thèmes officiels par défaut (Pokemon, Cozy, Horror, etc.)
+// Restaure tous les thèmes officiels par défaut (Steam Gold, Cozy, Horror, Dark Fantasy, Frutiger Aero)
 async function handleRestoreDefaultThemes() {
-  if (!confirm('Voulez-vous restaurer tous les thèmes officiels par défaut (Pokemon, Cozy, Horror, Dark Fantasy, Wii, etc.) ? Vos thèmes créés seront conservés.')) return
+  if (!confirm('Voulez-vous restaurer tous les thèmes officiels par défaut (Steam Gold, Cozy Pixel, Horror, Dark Fantasy, Frutiger Aero) ? Vos thèmes créés seront conservés.')) return
 
   try {
     if (window.steamAPI?.restoreDefaultThemes) {
       const res = await window.steamAPI.restoreDefaultThemes()
       if (res.success) {
         themeLibrary.value = res.library
-        showLibraryStatus('Thèmes par défaut restaurés avec succès ✔')
+        showLibraryStatus('Thèmes officiels par défaut restaurés avec succès ✔')
       }
     }
   } catch (err) {
     console.error('Erreur restauration thèmes:', err)
+  }
+}
+
+// -------------------------------------------------------------
+// SYSTÈME SIMPLE D'IMPORT / EXPORT DE THÈMES (UNIS OU BIBLIOTHÈQUE)
+// -------------------------------------------------------------
+
+function triggerImportClick() {
+  if (themeFileInput.value) {
+    themeFileInput.value.value = ''
+    themeFileInput.value.click()
+  }
+}
+
+async function handleThemeFileImport(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  try {
+    const text = await file.text()
+    const res = await themeStorage.importTheme(text)
+    if (res.success) {
+      themeLibrary.value = res.library
+      showLibraryStatus(`Thème "${res.importedTheme?.name}" importé avec succès ! 🎉`)
+    } else {
+      alert(res.error || 'Erreur lors de l\'importation du fichier')
+    }
+  } catch (err) {
+    alert(`Erreur de lecture du fichier : ${err.message}`)
+  }
+}
+
+async function handleExportTheme(themeId) {
+  try {
+    const res = await themeStorage.exportTheme(themeId)
+    if (res.success) {
+      showLibraryStatus(`Thème exporté dans ${res.fileName} 💾`)
+    } else {
+      showLibraryStatus(res.error || 'Erreur lors de l\'export')
+    }
+  } catch (err) {
+    showLibraryStatus('Erreur export: ' + err.message)
+  }
+}
+
+async function handleExportLibrary() {
+  try {
+    const res = await themeStorage.exportLibrary()
+    if (res.success) {
+      showLibraryStatus(`${res.count} thèmes sauvegardés dans ${res.fileName} 💾`)
+    } else {
+      showLibraryStatus(res.error || 'Erreur lors de la sauvegarde de la bibliothèque')
+    }
+  } catch (err) {
+    showLibraryStatus('Erreur export: ' + err.message)
+  }
+}
+
+// -------------------------------------------------------------
+// PARAMÈTRES GÉNÉRAUX & SORTIE AUDIO GLOBALE (WINDOWS)
+// -------------------------------------------------------------
+
+async function openGeneralSettingsModal() {
+  showGeneralSettingsModal.value = true
+  generalSettingsMessage.value = ''
+  await refreshGlobalAudioDevices()
+}
+
+function closeGeneralSettingsModal() {
+  showGeneralSettingsModal.value = false
+  generalSettingsMessage.value = ''
+}
+
+async function refreshGlobalAudioDevices() {
+  try {
+    const devs = await getAudioOutputDevices(true)
+    if (devs && devs.length > 0) {
+      audioDevicesList.value = devs
+    }
+  } catch (err) {
+    console.warn('[Dashboard] refreshGlobalAudioDevices error:', err)
+  }
+}
+
+async function testGlobalAudioOutput() {
+  if (isPlayingGlobalTest.value) return
+  isPlayingGlobalTest.value = true
+  try {
+    await playSynthesizedChime(
+      globalAudioSettings.value.soundVolume,
+      globalAudioSettings.value.deviceId,
+      'common'
+    )
+  } catch (err) {
+    console.error('[Dashboard] Erreur test audio global:', err)
+  } finally {
+    setTimeout(() => {
+      isPlayingGlobalTest.value = false
+    }, 850)
+  }
+}
+
+async function saveGeneralSettings() {
+  try {
+    // 1. Mise à jour de la configuration globale locale
+    setGlobalAudioSettings({
+      deviceId: globalAudioSettings.value.deviceId,
+      soundEnabled: globalAudioSettings.value.soundEnabled,
+      soundVolume: globalAudioSettings.value.soundVolume
+    })
+
+    // 2. Persistance dans le backend AppSettings
+    const newSettings = {
+      obsPort: modalPortValue.value || 8080,
+      soundEnabled: globalAudioSettings.value.soundEnabled,
+      soundVolume: globalAudioSettings.value.soundVolume,
+      audioDeviceId: globalAudioSettings.value.deviceId,
+      desktopOverlayEnabled: appSettings.value.desktopOverlayEnabled ?? true
+    }
+
+    if (window.steamAPI?.saveAppSettings) {
+      await window.steamAPI.saveAppSettings(newSettings)
+    }
+
+    generalSettingsMessage.value = 'Paramètres généraux enregistrés ✔'
+    setTimeout(() => {
+      closeGeneralSettingsModal()
+    }, 1100)
+  } catch (err) {
+    generalSettingsMessage.value = `Erreur : ${err.message}`
+  }
+}
+
+// -------------------------------------------------------------
+// SIMULATION ET TESTS DES 3 TIERS STEAM (COMMON, RARE, PLATINE)
+// -------------------------------------------------------------
+
+async function triggerDashboardTierTest(tier = 'common') {
+  if (isSimulating.value) return
+  isSimulating.value = true
+
+  const meta = ACHIEVEMENT_TIERS[tier] || ACHIEVEMENT_TIERS.common
+
+  // 1. Jouer immédiatement le son avec la tonalité / carillon du Tier dans l'app
+  let activeThm = null
+  if (window.steamAPI?.getActiveTheme) {
+    activeThm = await window.steamAPI.getActiveTheme().catch(() => null)
+  }
+  playAchievementSound(activeThm || {}, tier)
+
+  // 2. Diffuser l'alerte de test complète vers DesktopOverlay et OBS
+  try {
+    if (window.steamAPI?.broadcastTestAchievement) {
+      await window.steamAPI.broadcastTestAchievement({
+        appId: tier === 'rare' ? '550' : (tier === 'master' ? '1794680' : '440'),
+        achievementCode: tier === 'rare' ? 'ACH_FINISH_CAMPAIGN_MELEE_ONLY' : (tier === 'master' ? '100_PERCENT_MASTER' : 'TF_PLAY_GAME_EVERYCLASS'),
+        displayName: meta.defaultTitle,
+        description: meta.defaultDesc,
+        gameName: meta.defaultGame,
+        icon: meta.icon,
+        tier: tier,
+        rarityPercent: meta.defaultPercent,
+        isTest: false // Déclenche également le toast de prévisualisation dans le dashboard
+      })
+      showLibraryStatus(`Simulation de test "${meta.name}" diffusée ! 🚀`)
+    }
+  } catch (err) {
+    console.error('[Dashboard] Erreur simulation tier:', err)
+  } finally {
+    setTimeout(() => {
+      isSimulating.value = false
+    }, 1200)
   }
 }
 
@@ -3495,5 +3942,537 @@ function onIconError(e) {
 .btn-save-modal-key:hover {
   filter: brightness(1.15);
   box-shadow: 0 6px 18px rgba(76, 158, 227, 0.5);
+}
+
+/* Bouton Paramètres dans le Header */
+.btn-header-settings {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c7d5e0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-header-settings:hover {
+  background: rgba(102, 192, 244, 0.15);
+  border-color: rgba(102, 192, 244, 0.45);
+  color: #66c0f4;
+  transform: translateY(-1px);
+}
+
+.settings-gear-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Studio & Galerie de Thèmes (Refonte Visuelle) */
+.studio-theme-library {
+  position: relative;
+  overflow: hidden;
+}
+
+.studio-glow {
+  background: radial-gradient(circle, rgba(102, 192, 244, 0.3) 0%, transparent 70%);
+}
+
+.btn-import-theme,
+.btn-export-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #c7d5e0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-import-theme:hover,
+.btn-export-all:hover {
+  background: rgba(240, 195, 48, 0.12);
+  border-color: rgba(240, 195, 48, 0.4);
+  color: #f0c330;
+  transform: translateY(-1px);
+}
+
+.studio-filter-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+
+.studio-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  width: 260px;
+}
+
+.studio-search-box:focus-within {
+  border-color: #66c0f4;
+  box-shadow: 0 0 10px rgba(102, 192, 244, 0.2);
+}
+
+.search-icon {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.studio-search-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.82rem;
+  width: 100%;
+  outline: none;
+}
+
+.btn-clear-search {
+  background: transparent;
+  border: none;
+  color: #8b9bb4;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.studio-filter-chips {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8b9bb4;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.filter-chip.active {
+  background: rgba(102, 192, 244, 0.15);
+  border-color: #66c0f4;
+  color: #66c0f4;
+  font-weight: 700;
+}
+
+.studio-empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.studio-empty-state .empty-icon {
+  font-size: 2.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.studio-empty-state h4 {
+  margin: 0 0 0.4rem 0;
+  color: #fff;
+}
+
+.studio-empty-state p {
+  margin: 0 0 1rem 0;
+  color: #8b9bb4;
+  font-size: 0.85rem;
+}
+
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+.studio-card {
+  background: linear-gradient(180deg, rgba(20, 29, 43, 0.85) 0%, rgba(13, 19, 29, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.studio-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(102, 192, 244, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(102, 192, 244, 0.1);
+}
+
+.studio-card.is-active-theme {
+  border-color: rgba(240, 195, 48, 0.7);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 24px rgba(240, 195, 48, 0.2);
+}
+
+.studio-card-header {
+  padding: 0.8rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.studio-active-badge {
+  background: linear-gradient(135deg, rgba(240, 195, 48, 0.25) 0%, rgba(255, 219, 101, 0.15) 100%);
+  border: 1px solid rgba(240, 195, 48, 0.6);
+  color: #ffd644;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.inactive-badge-pill {
+  font-size: 0.7rem;
+  color: #69788f;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.card-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.effect-badge-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  color: #d8b4fe;
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+}
+
+.studio-info {
+  padding: 0.85rem 1rem 0.4rem 1rem;
+}
+
+.studio-preview-frame {
+  margin: 0.4rem 1rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #080d13;
+}
+
+.studio-actions-bar {
+  padding: 0.8rem 1rem;
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.btn-card-action.btn-export {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c7d5e0;
+  padding: 0.4rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-card-action.btn-export:hover {
+  background: rgba(102, 192, 244, 0.15);
+  border-color: rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+}
+
+/* Modal Paramètres Généraux */
+.general-settings-modal {
+  max-width: 580px;
+  width: 95vw;
+}
+
+.modal-subtitle-text {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.78rem;
+  color: #8b9bb4;
+}
+
+.general-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin: 1.25rem 0;
+}
+
+.settings-block {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.block-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.block-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.block-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.block-sub {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.74rem;
+  color: #8b9bb4;
+  line-height: 1.35;
+}
+
+.settings-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.device-select-global {
+  flex: 1;
+  background: rgba(16, 24, 34, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.device-select-global:focus {
+  border-color: #66c0f4;
+}
+
+.btn-test-global-audio {
+  background: rgba(102, 192, 244, 0.15);
+  border: 1px solid rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+  padding: 0.55rem 0.95rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-test-global-audio:hover:not(:disabled) {
+  background: rgba(102, 192, 244, 0.28);
+  box-shadow: 0 0 12px rgba(102, 192, 244, 0.3);
+}
+
+.settings-volume-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.global-volume-slider-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+.volume-pct {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f0c330;
+  min-width: 42px;
+}
+
+.port-input {
+  width: 140px;
+}
+
+.port-status-badge {
+  font-size: 0.76rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  color: #9cb3ce;
+}
+
+.port-status-badge.conflict {
+  border-color: #f0c330;
+  color: #ffd644;
+}
+
+/* Grille de Simulation des 3 Tiers */
+.sim-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.sim-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: rgba(102, 192, 244, 0.15);
+  border: 1px solid rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+
+.sim-tiers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.sim-tier-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.sim-tier-card:hover {
+  transform: translateY(-2px);
+}
+
+.sim-tier-card.common {
+  border-color: rgba(240, 195, 48, 0.3);
+  background: linear-gradient(180deg, rgba(240, 195, 48, 0.04) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.sim-tier-card.rare {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.sim-tier-card.master {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.sim-tier-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.sim-tier-card.common .sim-tier-badge { color: #f0c330; }
+.sim-tier-card.rare .sim-tier-badge { color: #c084fc; }
+.sim-tier-card.master .sim-tier-badge { color: #38bdf8; }
+
+.sim-tier-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sim-tier-game {
+  font-size: 0.72rem;
+  color: #8b9bb4;
+  margin-bottom: 0.4rem;
+}
+
+.btn-sim-action {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-sim-action.common {
+  background: rgba(240, 195, 48, 0.15);
+  border-color: rgba(240, 195, 48, 0.45);
+  color: #ffd644;
+}
+
+.btn-sim-action.common:hover:not(:disabled) {
+  background: rgba(240, 195, 48, 0.3);
+  box-shadow: 0 0 12px rgba(240, 195, 48, 0.25);
+}
+
+.btn-sim-action.rare {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+}
+
+.btn-sim-action.rare:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.35);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+}
+
+.btn-sim-action.master {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #7dd3fc;
+}
+
+.btn-sim-action.master:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
 }
 </style>

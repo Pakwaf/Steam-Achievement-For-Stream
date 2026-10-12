@@ -124,6 +124,10 @@ export const steamAPI = {
   duplicateTheme: (id) => themeStorage.duplicateTheme(id),
   deleteTheme: (id) => themeStorage.deleteTheme(id),
   restoreDefaultThemes: () => themeStorage.restoreDefaultThemes(),
+  exportTheme: (id) => themeStorage.exportTheme(id),
+  exportLibrary: () => themeStorage.exportLibrary(),
+  importTheme: (jsonOrString) => themeStorage.importTheme(jsonOrString),
+  importLibrary: (jsonOrString) => themeStorage.importLibrary(jsonOrString),
   onThemeLibraryUpdated: (callback) => themeStorage.onLibraryUpdated(callback),
 
   getCustomization: () => themeStorage.getActiveTheme(),

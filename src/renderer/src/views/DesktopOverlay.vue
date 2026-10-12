@@ -1,7 +1,8 @@
 <template>
   <div class="desktop-overlay-container">
-    <!-- Style CSS utilisateur injecté dynamiquement avec fallback garanti -->
+    <!-- Style CSS universel (effets, tiers) + CSS utilisateur injecté dynamiquement -->
     <component :is="'style'">
+      {{ visualEffectsCss }}
       {{ activePreviewTheme?.css || currentTheme.css || DEFAULT_THEME.css }}
     </component>
 
@@ -18,7 +19,9 @@
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from '../utils/soundPlayer.js'
+import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
 
+const visualEffectsCss = getVisualEffectsCss()
 const currentTheme = ref({ ...DEFAULT_THEME })
 const renderedHtml = ref('')
 const slotRef = ref(null)
@@ -76,27 +79,35 @@ function triggerAchievement(achievement) {
   const effectiveTheme = achievement.previewTheme || currentTheme.value
   activePreviewTheme.value = achievement.previewTheme || null
 
-  // 1. Jouer le son configuré via le moteur audio fiable
-  playAchievementSound(effectiveTheme)
+  const tier = achievement.tier || 'common'
 
-  // 2. Remplacer les placeholders {title}, {description}, {icon}, {game} avec fallback garanti
+  // 1. Jouer le son configuré via le moteur audio adapté au Tier
+  playAchievementSound(effectiveTheme, tier)
+
+  // 2. Remplacer les placeholders {title}, {description}, {icon}, {game}, {tier}, {tierLabel}
   const tpl = (effectiveTheme.html && effectiveTheme.html.trim())
     ? effectiveTheme.html
     : DEFAULT_THEME.html
 
-  renderedHtml.value = replacePlaceholders(tpl, achievement)
+  let processed = replacePlaceholders(tpl, achievement)
 
-  // 3. Appliquer l'animation d'entrée directement sur la carte racine (évite tout bug de containing block)
+  // 3. Enrichir avec les classes de Tier et le calque d'effets visuels
+  renderedHtml.value = enrichAchievementHtml(processed, {
+    tier,
+    visualEffect: effectiveTheme.visualEffect || 'none'
+  })
+
+  // 4. Appliquer l'animation d'entrée directement sur la carte racine
   nextTick(() => {
     const rootNode = slotRef.value?.firstElementChild
     if (rootNode) {
       rootNode.classList.remove('animate-leave')
-      void rootNode.offsetWidth // Force reflow pour relancer l'animation
+      void rootNode.offsetWidth
       rootNode.classList.add('animate-enter')
     }
   })
 
-  // 4. Après 5 secondes : animation de sortie puis masquage
+  // 5. Après 5 secondes : animation de sortie puis masquage
   dismissTimer = setTimeout(() => {
     const rootNode = slotRef.value?.firstElementChild
     if (rootNode) {
@@ -104,7 +115,7 @@ function triggerAchievement(achievement) {
       rootNode.classList.add('animate-leave')
     }
 
-    // 5. Fin de l'animation de sortie : nettoyage du HTML
+    // 6. Fin de l'animation de sortie : nettoyage du HTML
     leaveTimer = setTimeout(() => {
       renderedHtml.value = ''
       activePreviewTheme.value = null
@@ -114,16 +125,31 @@ function triggerAchievement(achievement) {
 
 function replacePlaceholders(template, data) {
   if (!template) return ''
+  const tier = data.tier || 'common'
+  const defaultBadge = tier === 'master' 
+    ? '🏆 JEU COMPLÉTÉ (100%)' 
+    : (tier === 'rare' ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ')
+  const rarityText = data.rarityPercent ? (data.rarityPercent + '%') : (tier === 'rare' ? '4.8%' : '42.5%')
+
   const title = escapeHtml(data.displayName || 'Succès Débloqué')
   const description = escapeHtml(data.description || '')
   const icon = data.icon || fallbackIcon
   const game = escapeHtml(data.gameName || 'Steam')
 
-  return template
+  let html = template
     .replace(/\{title\}/gi, title)
     .replace(/\{description\}/gi, description)
     .replace(/\{icon\}/gi, icon)
     .replace(/\{game\}/gi, game)
+    .replace(/\{tier\}/gi, tier)
+    .replace(/\{tierLabel\}/gi, defaultBadge)
+    .replace(/\{rarity\}/gi, rarityText)
+
+  if (tier !== 'common') {
+    html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge)
+  }
+
+  return html
 }
 
 function escapeHtml(text) {
