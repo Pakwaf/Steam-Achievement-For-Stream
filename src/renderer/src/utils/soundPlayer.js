@@ -273,12 +273,12 @@ export async function playAchievementSound(themeData = {}, tier = 'common') {
     ? themeData.audioDeviceId
     : (globalAudioSettings.deviceId || 'default')
 
-  // Si un fichier personnalisé est configuré
-  let customAudioPath = themeData.audioPath
+  // Si un fichier personnalisé est configuré pour ce Tier ou pour le thème de base
+  let customAudioPath = themeData.tiers?.[tier]?.audioPath || themeData.audioPath
   if (customAudioPath === undefined && window.steamAPI?.getActiveTheme) {
     try {
       const active = await window.steamAPI.getActiveTheme()
-      customAudioPath = active?.audioPath || null
+      customAudioPath = active?.tiers?.[tier]?.audioPath || active?.audioPath || null
     } catch {
       // ignore
     }

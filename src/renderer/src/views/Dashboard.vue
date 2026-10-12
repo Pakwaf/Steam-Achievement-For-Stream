@@ -610,7 +610,8 @@ async function triggerDashboardTierTest(tier = 'common') {
         icon: meta.icon,
         tier: tier,
         rarityPercent: meta.defaultPercent,
-        isTest: false
+        unlockedAt: new Date().toISOString(),
+        isTest: true
       })
       showLibraryStatus(`Simulation de test "${meta.name}" diffusée ! 🚀`)
     }

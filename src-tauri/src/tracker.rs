@@ -592,7 +592,7 @@ impl AchievementTracker {
     }
 }
 
-fn chrono_like_now() -> String {
+pub fn chrono_like_now() -> String {
     // Format ISO 8601 simple sans dépendance chrono
     let dur = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

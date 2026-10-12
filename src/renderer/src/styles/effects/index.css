@@ -1,0 +1,20 @@
+/* ========================================================
+   REGROUPEMENT ET EXPORT UNIFIÉ DES EFFETS ET TIERS
+   ======================================================== */
+
+@import './stars.css';
+@import './neonContour.css';
+@import './goldenShimmer.css';
+@import './embers.css';
+@import './cyberGlitch.css';
+@import './tiers.css';
+
+/* Calque universel obligatoire injecté sur les cartes de succès */
+.theme-effect-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 10;
+}

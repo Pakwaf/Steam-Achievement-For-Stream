@@ -19,14 +19,21 @@ pub struct SteamUser {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Achievement {
+    #[serde(default)]
     pub app_id: String,
+    #[serde(default)]
     pub achievement_code: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_name: Option<String>,
+    #[serde(default)]
     pub display_name: String,
+    #[serde(default)]
     pub description: String,
+    #[serde(default)]
     pub icon: String,
+    #[serde(default)]
     pub game_name: String,
+    #[serde(default)]
     pub unlocked_at: String,
     #[serde(default)]
     pub is_test: bool,
@@ -34,7 +41,7 @@ pub struct Achievement {
     pub tier: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rarity_percent: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_theme: Option<serde_json::Value>,
 }
 
@@ -45,7 +52,9 @@ pub struct ThemeCustomization {
     pub id: Option<String>,
     #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub html: String,
+    #[serde(default)]
     pub css: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visual_effect: Option<String>,
@@ -57,6 +66,8 @@ pub struct ThemeCustomization {
     pub sound_enabled: bool,
     #[serde(default = "default_sound_volume")]
     pub sound_volume: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tiers: Option<serde_json::Value>,
 }
 
 fn default_sound_enabled() -> bool {

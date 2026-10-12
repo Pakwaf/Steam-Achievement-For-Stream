@@ -2,7 +2,7 @@ use crate::models::{Achievement, ObsStatus};
 use axum::{
     extract::{
         ws::{rejection::WebSocketUpgradeRejection, Message, WebSocket, WebSocketUpgrade},
-        State,
+        Query, State,
     },
     http::{header, StatusCode},
     response::{Html, IntoResponse, Response},
@@ -274,6 +274,18 @@ impl ObsServer {
         let _ = self.broadcast_tx.send(payload.to_string());
     }
 
+    pub fn broadcast_raw(&self, payload: String) {
+        let _ = self.broadcast_tx.send(payload);
+    }
+
+    pub fn broadcast_json(&self, val: &serde_json::Value) {
+        let payload = serde_json::json!({
+            "type": "ACHIEVEMENT_UNLOCKED",
+            "data": val
+        });
+        let _ = self.broadcast_tx.send(payload.to_string());
+    }
+
     pub async fn update_customization(&self, theme: serde_json::Value) {
         let has_audio = theme
             .get("audioPath")
@@ -286,6 +298,7 @@ impl ObsServer {
             "css": theme.get("css").and_then(|v| v.as_str()).unwrap_or(DEFAULT_CSS),
             "visualEffect": theme.get("visualEffect").and_then(|v| v.as_str()).unwrap_or("none"),
             "audioPath": theme.get("audioPath"),
+            "tiers": theme.get("tiers"),
             "hasAudio": has_audio,
             "audioUrl": if has_audio { Some("/audio/custom") } else { None },
             "soundEnabled": theme.get("soundEnabled").and_then(|v| v.as_bool()).unwrap_or(true),
@@ -606,28 +619,40 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
     }}
 
     /* 1. Étoiles Scintillantes */
+    .fx-stars {{
+      position: relative;
+    }}
     .fx-stars .theme-effect-layer::before,
     .fx-stars .theme-effect-layer::after {{
       content: '';
       position: absolute;
-      inset: 0;
+      inset: -10px;
+      pointer-events: none;
       background-image: 
-        radial-gradient(2px 2px at 15% 25%, #fff, rgba(255, 255, 255, 0)),
-        radial-gradient(3px 3px at 45% 15%, #ffd700, rgba(255, 215, 0, 0)),
-        radial-gradient(2.5px 2.5px at 75% 35%, #fff, rgba(255, 255, 255, 0)),
-        radial-gradient(2px 2px at 25% 75%, #ffdb65, rgba(255, 219, 101, 0)),
-        radial-gradient(3px 3px at 65% 85%, #fff, rgba(255, 255, 255, 0)),
-        radial-gradient(2px 2px at 85% 65%, #ffd700, rgba(255, 215, 0, 0));
-      animation: fx-obs-sparkle 2.2s infinite ease-in-out alternate;
+        radial-gradient(ellipse at 12% 22%, #ffffff 0%, #ffd700 35%, rgba(255, 215, 0, 0) 70%),
+        radial-gradient(ellipse at 42% 12%, #ffffff 0%, #ffe066 30%, rgba(255, 224, 102, 0) 65%),
+        radial-gradient(ellipse at 78% 28%, #ffffff 0%, #ffd700 40%, rgba(255, 215, 0, 0) 75%),
+        radial-gradient(ellipse at 22% 78%, #ffffff 0%, #ffc837 35%, rgba(255, 200, 55, 0) 70%),
+        radial-gradient(ellipse at 62% 88%, #ffffff 0%, #ffd700 40%, rgba(255, 215, 0, 0) 70%),
+        radial-gradient(ellipse at 88% 70%, #ffffff 0%, #ffeaa7 30%, rgba(255, 234, 167, 0) 65%),
+        radial-gradient(circle at 50% 4%, #ffd700 0%, rgba(255, 215, 0, 0) 60%),
+        radial-gradient(circle at 96% 45%, #ffffff 0%, #ffd700 40%, rgba(255, 215, 0, 0) 70%);
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      filter: drop-shadow(0 0 10px #ffd700) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+      animation: fx-obs-stars 2.2s infinite ease-in-out alternate;
+      z-index: 10;
     }}
     .fx-stars .theme-effect-layer::after {{
       animation-delay: -1.1s;
-      transform: rotate(180deg);
+      animation-duration: 2.6s;
+      transform: rotate(180deg) scale(0.95);
+      filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 16px rgba(112, 214, 255, 0.9));
     }}
-    @keyframes fx-obs-sparkle {{
-      0% {{ opacity: 0.2; transform: scale(0.96); }}
-      50% {{ opacity: 0.95; transform: scale(1.02); filter: drop-shadow(0 0 6px #ffd700); }}
-      100% {{ opacity: 0.3; transform: scale(0.98); }}
+    @keyframes fx-obs-stars {{
+      0% {{ opacity: 0.35; transform: scale(0.94); }}
+      50% {{ opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 14px #ffd700) drop-shadow(0 0 28px rgba(255, 215, 0, 0.95)); }}
+      100% {{ opacity: 0.45; transform: scale(0.98); }}
     }}
 
     /* 2. Contour Néon */
@@ -637,110 +662,203 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
     .fx-neon-contour .theme-effect-layer::before {{
       content: '';
       position: absolute;
-      inset: -2px;
+      inset: -3.5px;
       border-radius: inherit;
-      padding: 2px;
-      background: conic-gradient(from 0deg, #f0c330, #ff6b6b, #4facfe, #00f2fe, #f0c330);
+      padding: 3.5px;
+      background: conic-gradient(from 0deg, #ff0055 0%, #ffb703 20%, #00f2fe 40%, #7209b7 60%, #00ff87 80%, #ff0055 100%);
       -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
       -webkit-mask-composite: xor;
       mask-composite: exclude;
-      animation: fx-obs-neon-spin 3.5s linear infinite;
-      filter: drop-shadow(0 0 8px rgba(240, 195, 48, 0.6));
+      animation: fx-obs-neon-spin 2.8s linear infinite;
+      filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)) drop-shadow(0 0 28px rgba(255, 0, 85, 0.8));
+      z-index: 12;
+    }}
+    .fx-neon-contour .theme-effect-layer::after {{
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: inherit;
+      border: 1px solid rgba(0, 242, 254, 0.45);
+      box-shadow: 0 0 28px rgba(0, 242, 254, 0.65), inset 0 0 20px rgba(255, 0, 85, 0.4);
+      animation: fx-obs-neon-pulse 1.8s infinite alternate ease-in-out;
+      pointer-events: none;
+      z-index: 9;
     }}
     @keyframes fx-obs-neon-spin {{
-      0% {{ filter: hue-rotate(0deg) drop-shadow(0 0 8px rgba(240, 195, 48, 0.6)); }}
-      100% {{ filter: hue-rotate(360deg) drop-shadow(0 0 8px rgba(240, 195, 48, 0.6)); }}
+      0% {{ filter: hue-rotate(0deg) drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)); }}
+      100% {{ filter: hue-rotate(360deg) drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)); }}
+    }}
+    @keyframes fx-obs-neon-pulse {{
+      0% {{ opacity: 0.4; transform: scale(0.99); }}
+      100% {{ opacity: 1; transform: scale(1.02); box-shadow: 0 0 42px rgba(0, 242, 254, 0.95), inset 0 0 28px rgba(255, 0, 85, 0.6); }}
     }}
 
     /* 3. Shimmer Doré Balayant */
+    .fx-golden-shimmer {{
+      position: relative;
+    }}
+    .fx-golden-shimmer .theme-effect-layer::before {{
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 28px rgba(255, 215, 0, 0.45), 0 0 24px rgba(255, 193, 7, 0.35);
+      pointer-events: none;
+      z-index: 8;
+    }}
     .fx-golden-shimmer .theme-effect-layer::after {{
       content: '';
       position: absolute;
-      top: -60%;
-      left: -60%;
-      width: 220%;
-      height: 220%;
+      top: -75%;
+      left: -75%;
+      width: 250%;
+      height: 250%;
       background: linear-gradient(
         115deg,
-        transparent 25%,
-        rgba(255, 235, 140, 0.05) 42%,
-        rgba(255, 245, 180, 0.45) 48%,
-        rgba(255, 255, 255, 0.8) 50%,
-        rgba(255, 245, 180, 0.45) 52%,
-        rgba(255, 235, 140, 0.05) 58%,
-        transparent 75%
+        transparent 15%,
+        rgba(255, 215, 0, 0.15) 30%,
+        rgba(255, 235, 120, 0.7) 44%,
+        rgba(255, 255, 255, 0.98) 50%,
+        rgba(255, 235, 120, 0.7) 56%,
+        rgba(255, 180, 0, 0.4) 68%,
+        transparent 82%
       );
-      transform: rotate(25deg);
-      animation: fx-obs-shimmer 3.2s infinite ease-in-out;
+      transform: rotate(26deg);
+      animation: fx-obs-shimmer 2.5s infinite ease-in-out;
+      pointer-events: none;
+      filter: drop-shadow(0 0 18px rgba(255, 215, 0, 0.95));
+      mix-blend-mode: screen;
+      z-index: 15;
     }}
     @keyframes fx-obs-shimmer {{
-      0% {{ transform: translateX(-150%) rotate(25deg); }}
-      35%, 100% {{ transform: translateX(150%) rotate(25deg); }}
+      0% {{ transform: translateX(-160%) rotate(26deg); opacity: 0.1; }}
+      15% {{ opacity: 1; }}
+      45% {{ transform: translateX(160%) rotate(26deg); opacity: 1; }}
+      46%, 100% {{ transform: translateX(160%) rotate(26deg); opacity: 0; }}
     }}
 
     /* 4. Braises Flottantes */
+    .fx-embers {{
+      position: relative;
+    }}
     .fx-embers .theme-effect-layer::before {{
       content: '';
       position: absolute;
       inset: 0;
-      background-image: 
-        radial-gradient(2px 2px at 20% 80%, #ff5722, transparent),
-        radial-gradient(3px 3px at 50% 90%, #ff9800, transparent),
-        radial-gradient(2.5px 2.5px at 80% 85%, #ff3d00, transparent),
-        radial-gradient(2px 2px at 30% 60%, #ffc107, transparent);
-      animation: fx-obs-embers 2.5s infinite linear;
+      border-radius: inherit;
+      box-shadow: inset 0 -35px 50px rgba(255, 69, 0, 0.65), 0 0 35px rgba(255, 87, 34, 0.55);
+      animation: fx-obs-embers-glow 1.9s infinite alternate ease-in-out;
+      z-index: 8;
     }}
-    @keyframes fx-obs-embers {{
-      0% {{ transform: translateY(10px); opacity: 0; }}
-      50% {{ opacity: 0.9; }}
-      100% {{ transform: translateY(-20px); opacity: 0; }}
+    .fx-embers .theme-effect-layer::after {{
+      content: '';
+      position: absolute;
+      inset: -15px;
+      background-image: 
+        radial-gradient(circle at 18% 92%, #ffffff 0%, #ff5722 45%, rgba(255, 87, 34, 0) 80%),
+        radial-gradient(circle at 45% 96%, #fff275 0%, #ff3d00 50%, rgba(255, 61, 0, 0) 85%),
+        radial-gradient(circle at 74% 90%, #ffffff 0%, #ff9800 45%, rgba(255, 152, 0, 0) 80%),
+        radial-gradient(circle at 30% 70%, #ffea00 0%, #d90429 55%, rgba(217, 4, 41, 0) 80%),
+        radial-gradient(circle at 62% 65%, #ffffff 0%, #ff5722 50%, rgba(255, 87, 34, 0) 85%),
+        radial-gradient(circle at 88% 75%, #fff275 0%, #ff3d00 50%, rgba(255, 61, 0, 0) 80%),
+        radial-gradient(circle at 50% 40%, #ffea00 0%, #d90429 50%, rgba(217, 4, 41, 0) 80%);
+      background-size: 100% 100%;
+      animation: fx-obs-embers-rise 2.2s infinite linear;
+      filter: drop-shadow(0 0 14px #ff5722) drop-shadow(0 0 26px rgba(255, 69, 0, 0.9));
+      z-index: 12;
+    }}
+    @keyframes fx-obs-embers-rise {{
+      0% {{ transform: translateY(18px) scale(0.96); opacity: 0.2; }}
+      35% {{ opacity: 1; }}
+      100% {{ transform: translateY(-42px) scale(1.05); opacity: 0; filter: drop-shadow(0 0 8px #ff3d00) blur(1.5px); }}
+    }}
+    @keyframes fx-obs-embers-glow {{
+      0% {{ opacity: 0.55; }}
+      100% {{ opacity: 1; box-shadow: inset 0 -48px 60px rgba(255, 69, 0, 0.85), 0 0 45px rgba(255, 87, 34, 0.7); }}
     }}
 
     /* 5. Aura Cybernétique */
+    .fx-cyber-glitch {{
+      position: relative;
+    }}
     .fx-cyber-glitch .theme-effect-layer::before {{
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      box-shadow:
+        inset 0 0 35px rgba(0, 242, 254, 0.65),
+        0 0 35px rgba(0, 242, 254, 0.85),
+        0 0 60px rgba(247, 37, 133, 0.6);
+      animation: fx-obs-cyber-pulse 1.8s infinite alternate ease-in-out;
+      z-index: 10;
+    }}
+    .fx-cyber-glitch .theme-effect-layer::after {{
       content: '';
       position: absolute;
       inset: 0;
       border-radius: inherit;
-      box-shadow: inset 0 0 24px rgba(0, 242, 254, 0.4), 0 0 20px rgba(0, 242, 254, 0.3);
-      animation: fx-obs-cyber 2s infinite alternate ease-in-out;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0, 242, 254, 0.3) 50%,
+        transparent 100%
+      );
+      background-size: 100% 8px;
+      animation: fx-obs-scanline 2.8s linear infinite;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      z-index: 12;
     }}
-    @keyframes fx-obs-cyber {{
-      0% {{ opacity: 0.3; }}
-      100% {{ opacity: 0.95; }}
+    @keyframes fx-obs-cyber-pulse {{
+      0% {{ opacity: 0.45; transform: scale(0.99); }}
+      100% {{ opacity: 1; transform: scale(1.015); box-shadow: inset 0 0 50px rgba(0, 242, 254, 0.85), 0 0 52px rgba(0, 242, 254, 1), 0 0 75px rgba(247, 37, 133, 0.8); }}
+    }}
+    @keyframes fx-obs-scanline {{
+      0% {{ transform: translateY(-100%); }}
+      100% {{ transform: translateY(100%); }}
     }}
 
     /* Tier Rare (< 10%) */
     .tier-rare {{
-      border-color: rgba(168, 85, 247, 0.8) !important;
-      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85), 0 0 36px rgba(168, 85, 247, 0.35) !important;
+      border-color: rgba(168, 85, 247, 0.9) !important;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 38px rgba(168, 85, 247, 0.65), inset 0 0 24px rgba(192, 132, 252, 0.35) !important;
+    }}
+    .tier-rare .card-glow {{
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.55) 0%, transparent 70%) !important;
     }}
     .tier-rare .unlock-tag {{
       background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(139, 92, 246, 0.25) 100%) !important;
-      color: #c084fc !important;
-      border-color: rgba(168, 85, 247, 0.6) !important;
+      color: #e9d5ff !important;
+      border-color: rgba(168, 85, 247, 0.7) !important;
       font-weight: 800 !important;
+      text-shadow: 0 0 10px rgba(168, 85, 247, 0.8) !important;
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.45) !important;
     }}
     .tier-rare .icon-container {{
       border-color: #a855f7 !important;
-      box-shadow: 0 0 18px rgba(168, 85, 247, 0.55) !important;
+      box-shadow: 0 0 24px rgba(168, 85, 247, 0.75), inset 0 0 12px rgba(192, 132, 252, 0.5) !important;
     }}
 
     /* Tier Master (100% Platine) */
     .tier-master {{
-      border-color: rgba(56, 189, 248, 0.9) !important;
-      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.9), 0 0 45px rgba(56, 189, 248, 0.5) !important;
+      border-color: rgba(56, 189, 248, 0.95) !important;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 50px rgba(56, 189, 248, 0.85), 0 0 25px rgba(255, 215, 0, 0.7), inset 0 0 30px rgba(56, 189, 248, 0.45) !important;
+    }}
+    .tier-master .card-glow {{
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.6) 0%, rgba(255, 215, 0, 0.3) 50%, transparent 75%) !important;
     }}
     .tier-master .unlock-tag {{
-      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%) !important;
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 50%, #f59e0b 100%) !important;
       color: #ffffff !important;
-      border-color: rgba(255, 255, 255, 0.6) !important;
-      font-weight: 800 !important;
-      box-shadow: 0 0 14px rgba(56, 189, 248, 0.7) !important;
+      border-color: rgba(255, 255, 255, 0.8) !important;
+      font-weight: 900 !important;
+      text-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.9), 0 0 12px rgba(255, 215, 0, 0.8) !important;
     }}
     .tier-master .icon-container {{
       border-color: #38bdf8 !important;
-      box-shadow: 0 0 24px rgba(56, 189, 248, 0.75) !important;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.9), 0 0 15px rgba(255, 215, 0, 0.8), inset 0 0 18px rgba(56, 189, 248, 0.6) !important;
     }}
   </style>
   <style id="custom-theme-css">
@@ -766,6 +884,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
 
     let currentHtmlTemplate = {html_template_json};
     let currentVisualEffect = {visual_effect_json};
+    let currentThemeData = null;
     let soundSettings = {{
       hasAudio: {has_audio},
       audioUrl: {has_audio} ? '/audio/custom?_v=' + Date.now() : null,
@@ -784,7 +903,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       return text.toString().replace(/[&<>"']/g, function(m) {{ return map[m]; }});
     }}
 
-    function renderCustomHtml(template, item) {{
+    function renderCustomHtml(template, item, visualEffect) {{
       if (!template) return '';
       const tier = item.tier || 'common';
       const defaultBadge = tier === 'master' 
@@ -801,27 +920,37 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         .replace(/\{{tierLabel\}}/gi, defaultBadge)
         .replace(/\{{rarity\}}/gi, rarityText);
 
-      // Si le template contient "SUCCÈS DÉBLOQUÉ" et qu'on est sur un tier supérieur
       if (tier !== 'common') {{
         html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge);
       }}
 
-      // Injection de la couche d'effet visuel
-      if (currentVisualEffect && currentVisualEffect !== 'none' && !html.includes('theme-effect-layer')) {{
+      const activeFx = visualEffect !== undefined ? visualEffect : currentVisualEffect;
+      if (activeFx && activeFx !== 'none' && !html.includes('theme-effect-layer')) {{
         html = html.replace(/(<div[^>]*class=["'][^"']*card[^"']*["'][^>]*>)/i, '$1<div class="theme-effect-layer"></div>');
       }}
 
-      // Ajout des classes de tier et fx sur le premier conteneur
       const tierClass = 'tier-' + tier;
-      const fxClass = (currentVisualEffect && currentVisualEffect !== 'none') ? ('fx-' + currentVisualEffect.replace(/_/g, '-')) : '';
+      const fxClass = (activeFx && activeFx !== 'none') ? ('fx-' + activeFx.replace(/_/g, '-')) : '';
       html = html.replace(/(class=["'])/i, '$1' + tierClass + ' ' + fxClass + ' ');
 
       return html;
     }}
 
-    function playNotificationSound(tier) {{
+    function playNotificationSound(tier, thm) {{
       if (!soundSettings.soundEnabled) return;
-      if (soundSettings.hasAudio && soundSettings.audioUrl) {{
+      const themeObj = thm || currentThemeData || {{}};
+      const tierAudio = (themeObj.tiers && themeObj.tiers[tier] && themeObj.tiers[tier].audioPath)
+        ? themeObj.tiers[tier].audioPath
+        : themeObj.audioPath;
+
+      if (tierAudio) {{
+        try {{
+          const audio = new Audio('/audio/custom?tier=' + encodeURIComponent(tier) + '&_v=' + Date.now());
+          audio.volume = soundSettings.soundVolume;
+          audio.play().catch(function() {{ playChimeFallback(tier); }});
+          return;
+        }} catch(e) {{}}
+      }} else if (soundSettings.hasAudio && soundSettings.audioUrl) {{
         try {{
           const audio = new Audio(soundSettings.audioUrl);
           audio.volume = soundSettings.soundVolume;
@@ -841,7 +970,6 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         const vol = 0.08 * soundSettings.soundVolume;
 
         if (tier === 'master') {{
-          // Fanfare triomphante Platine
           const notes = [
             {{ f: 523.25, t: 0.00, dur: 0.35, v: 0.8 }},
             {{ f: 659.25, t: 0.12, dur: 0.40, v: 0.85 }},
@@ -861,7 +989,6 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
             osc.stop(now + n.t + n.dur + 0.05);
           }});
         }} else if (tier === 'rare') {{
-          // Arpège mystique Rare
           const notes = [
             {{ f: 659.25, t: 0.00, dur: 0.40, v: 0.85 }},
             {{ f: 830.61, t: 0.11, dur: 0.45, v: 0.95 }},
@@ -880,7 +1007,6 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
             osc.stop(now + n.t + n.dur + 0.05);
           }});
         }} else {{
-          // Standard : D5 + A5
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
@@ -900,8 +1026,32 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       if (leaveTimeout) clearTimeout(leaveTimeout);
 
       const tier = item.tier || 'common';
-      playNotificationSound(tier);
-      achSlot.innerHTML = renderCustomHtml(currentHtmlTemplate, item);
+      const preview = item.previewTheme;
+      const effectiveTheme = preview || currentThemeData || {{}};
+
+      let tpl = '';
+      if (effectiveTheme.tiers && effectiveTheme.tiers[tier] && effectiveTheme.tiers[tier].html && effectiveTheme.tiers[tier].html.trim()) {{
+        tpl = effectiveTheme.tiers[tier].html;
+      }} else if (effectiveTheme.html && effectiveTheme.html.trim()) {{
+        tpl = effectiveTheme.html;
+      }} else {{
+        tpl = currentHtmlTemplate;
+      }}
+
+      let css = '';
+      if (effectiveTheme.tiers && effectiveTheme.tiers[tier] && effectiveTheme.tiers[tier].css && effectiveTheme.tiers[tier].css.trim()) {{
+        css = (effectiveTheme.css || '') + '\n' + effectiveTheme.tiers[tier].css;
+      }} else if (effectiveTheme.css) {{
+        css = effectiveTheme.css;
+      }}
+      if (css) {{
+        customCssElem.textContent = css;
+      }}
+
+      const fx = effectiveTheme.visualEffect || currentVisualEffect || 'none';
+
+      playNotificationSound(tier, effectiveTheme);
+      achSlot.innerHTML = renderCustomHtml(tpl, item, fx);
 
       const card = achSlot.firstElementChild;
       if (card) {{
@@ -917,6 +1067,9 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         }}
         leaveTimeout = setTimeout(function() {{
           achSlot.innerHTML = '';
+          if (preview && currentThemeData && currentThemeData.css) {{
+            customCssElem.textContent = currentThemeData.css;
+          }}
         }}, 450);
       }}, 5000);
     }}
@@ -936,6 +1089,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         try {{
           const msg = JSON.parse(ev.data);
           if (msg.type === 'CUSTOMIZATION_UPDATED' && msg.data) {{
+            currentThemeData = msg.data;
             if (msg.data.css) customCssElem.textContent = msg.data.css;
             if (msg.data.html) currentHtmlTemplate = msg.data.html;
             if (msg.data.visualEffect !== undefined) currentVisualEffect = msg.data.visualEffect;
@@ -975,12 +1129,30 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
 }
 
 // Handler pour servir le son personnalisé
-async fn audio_handler(State(server): State<Arc<ObsServer>>) -> Response {
+async fn audio_handler(
+    State(server): State<Arc<ObsServer>>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let tier = params.get("tier").cloned();
     let audio_path = {
         let cur = server.current_theme.read().await;
-        cur.get("audioPath")
-            .and_then(|v| v.as_str())
-            .map(PathBuf::from)
+        let tier_path = tier.as_ref().and_then(|t| {
+            cur.get("tiers")
+                .and_then(|tiers| tiers.get(t))
+                .and_then(|tier_obj| tier_obj.get("audioPath"))
+                .and_then(|v| v.as_str())
+                .map(PathBuf::from)
+        });
+
+        if let Some(p) = tier_path {
+            if p.exists() {
+                Some(p)
+            } else {
+                cur.get("audioPath").and_then(|v| v.as_str()).map(PathBuf::from)
+            }
+        } else {
+            cur.get("audioPath").and_then(|v| v.as_str()).map(PathBuf::from)
+        }
     };
 
     if let Some(path) = audio_path {

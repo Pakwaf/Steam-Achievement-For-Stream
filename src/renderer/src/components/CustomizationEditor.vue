@@ -103,6 +103,7 @@
           @click="activeTab = 'html'"
         >
           <span>HTML</span>
+          <span v-if="hasTierCustomization(selectedEditingTier) && selectedEditingTier !== 'common'" class="tab-badge tier-badge-active">Tier</span>
         </button>
         <button
           class="tab-btn"
@@ -110,6 +111,7 @@
           @click="activeTab = 'css'"
         >
           <span>CSS</span>
+          <span v-if="hasTierCustomization(selectedEditingTier) && selectedEditingTier !== 'common'" class="tab-badge tier-badge-active">Tier</span>
         </button>
         <button
           class="tab-btn"
@@ -117,7 +119,7 @@
           @click="activeTab = 'audio'"
         >
           <span>Audio</span>
-          <span v-if="theme.audioPath" class="tab-badge audio-active">Perso</span>
+          <span v-if="currentEditingAudioPath" class="tab-badge audio-active">Perso</span>
         </button>
         <button
           class="tab-btn"
@@ -142,6 +144,58 @@
       </div>
     </div>
 
+    <!-- Barre de Rareté (Tier) en cours d'édition -->
+    <div class="tier-editor-selector-bar">
+      <div class="tier-selector-label-wrap">
+        <span class="tier-icon-indicator">💎</span>
+        <span class="tier-selector-label">Rareté éditée :</span>
+      </div>
+      <div class="tier-buttons-group">
+        <button
+          class="tier-select-btn common"
+          :class="{ active: selectedEditingTier === 'common' }"
+          @click="selectEditingTier('common')"
+        >
+          <span class="btn-tier-badge">🏅 Standard (> 10%)</span>
+        </button>
+        <button
+          class="tier-select-btn rare"
+          :class="{ active: selectedEditingTier === 'rare' }"
+          @click="selectEditingTier('rare')"
+        >
+          <span class="btn-tier-badge">★ Rare (&lt; 10%)</span>
+          <span v-if="hasTierCustomization('rare')" class="tier-custom-dot" title="Ce tier a du contenu personnalisé">●</span>
+        </button>
+        <button
+          class="tier-select-btn master"
+          :class="{ active: selectedEditingTier === 'master' }"
+          @click="selectEditingTier('master')"
+        >
+          <span class="btn-tier-badge">🏆 Platine 100%</span>
+          <span v-if="hasTierCustomization('master')" class="tier-custom-dot" title="Ce tier a du contenu personnalisé">●</span>
+        </button>
+      </div>
+
+      <div v-if="selectedEditingTier !== 'common'" class="tier-actions-extra">
+        <button
+          v-if="!hasTierCustomization(selectedEditingTier)"
+          class="btn-customize-tier"
+          title="Copier le template standard pour le personnaliser spécifiquement pour ce tier"
+          @click="enableTierCustomization(selectedEditingTier)"
+        >
+          ⚡ Personnaliser ce Tier
+        </button>
+        <button
+          v-else
+          class="btn-reset-tier"
+          title="Supprimer la personnalisation de ce tier et réhériter du template standard"
+          @click="resetTierCustomization(selectedEditingTier)"
+        >
+          ↩ Réhériter du Standard
+        </button>
+      </div>
+    </div>
+
     <!-- 0. Onglet Effets Visuels & Tiers -->
     <div v-show="activeTab === 'effects'" class="tab-pane">
       <EditorEffectsTab
@@ -151,6 +205,7 @@
         :is-testing="isTesting"
         @select-visual-effect="selectVisualEffect"
         @trigger-tier-test="triggerTierTest"
+        @edit-tier="handleEditTierFromEffects"
       />
     </div>
 
@@ -159,12 +214,14 @@
       <div class="editor-pane-layout">
         <div class="editor-column">
           <div class="code-editor-header">
-            <span class="editor-label">Structure HTML du Succès</span>
-            <span class="editor-hint">Utilisez des balises HTML valides et stylisez-les via l'onglet CSS</span>
+            <span class="editor-label">Structure HTML — {{ selectedEditingTierName }}</span>
+            <span class="editor-hint">
+              {{ selectedEditingTier === 'common' ? 'Modèle principal par défaut' : (hasTierCustomization(selectedEditingTier) ? 'Modèle personnalisé pour ce tier' : 'Hérite du HTML standard') }}
+            </span>
           </div>
           <textarea
             ref="htmlTextarea"
-            v-model="theme.html"
+            v-model="currentEditingHtml"
             class="code-textarea html-mode"
             spellcheck="false"
             placeholder="<div>...</div>"
@@ -233,11 +290,13 @@
     <div v-show="activeTab === 'css'" class="tab-pane">
       <div class="editor-column">
         <div class="code-editor-header">
-          <span class="editor-label">Styles CSS du Thème</span>
-          <span class="editor-hint">Vous pouvez utiliser des animations CSS (@keyframes), du flexbox, et des filtres graphiques</span>
+          <span class="editor-label">Styles CSS — {{ selectedEditingTierName }}</span>
+          <span class="editor-hint">
+            {{ selectedEditingTier === 'common' ? 'Feuille de style principale du thème' : 'Règles CSS spécifiques injectées pour ce tier' }}
+          </span>
         </div>
         <textarea
-          v-model="theme.css"
+          v-model="currentEditingCss"
           class="code-textarea css-mode"
           spellcheck="false"
           placeholder=".achievement-card { ... }"
@@ -250,14 +309,14 @@
       <EditorAudioTab
         v-model:sound-enabled="theme.soundEnabled"
         v-model:sound-volume="theme.soundVolume"
-        v-model:audio-device-id="theme.audioDeviceId"
-        :audio-path="theme.audioPath"
-        :audio-devices="audioDevices"
+        :audio-path="currentEditingAudioPath"
+        :fallback-audio-path="theme.audioPath"
+        :selected-tier="selectedEditingTier"
+        :selected-tier-name="selectedEditingTierName"
         :is-playing-sound="isPlayingSound"
         @browse-audio-file="browseAudioFile"
         @remove-audio-file="removeAudioFile"
         @play-test-sound="playTestSound"
-        @refresh-audio-devices="refreshAudioDevices"
       />
     </div>
 
@@ -267,7 +326,7 @@
         v-model:selected-preview-tier="selectedPreviewTier"
         :selected-preview-tier-name="selectedPreviewTierName"
         :visual-effects-css="visualEffectsCss"
-        :theme-css="theme.css || ''"
+        :theme-css="computedPreviewCss"
         :preview-html="previewHtml"
       />
     </div>
@@ -300,6 +359,7 @@ const emit = defineEmits(['back', 'saved', 'activate'])
 const visualEffectsList = VISUAL_EFFECTS
 const visualEffectsCss = getVisualEffectsCss()
 const selectedPreviewTier = ref('common')
+const selectedEditingTier = ref('common')
 
 const activeTab = ref('effects')
 const isSaving = ref(false)
@@ -317,12 +377,15 @@ const theme = ref({
   audioPath: null,
   audioDeviceId: 'default',
   soundEnabled: true,
-  soundVolume: 0.8
+  soundVolume: 0.8,
+  tiers: {}
 })
 
-const audioDevices = ref([
-  { deviceId: 'default', label: 'Périphérique Windows par défaut' }
-])
+const selectedEditingTierName = computed(() => {
+  if (selectedEditingTier.value === 'master') return '100% Platine'
+  if (selectedEditingTier.value === 'rare') return 'Succès Rare (< 10%)'
+  return 'Standard (> 10%)'
+})
 
 const currentEffectName = computed(() => {
   const found = visualEffectsList.find((e) => e.id === (theme.value.visualEffect || 'none'))
@@ -333,6 +396,116 @@ const selectedPreviewTierName = computed(() => {
   return selectedPreviewTier.value === 'master'
     ? '100% Platine'
     : (selectedPreviewTier.value === 'rare' ? 'Succès Rare < 10%' : 'Succès Standard')
+})
+
+function selectEditingTier(tier) {
+  selectedEditingTier.value = tier
+  selectedPreviewTier.value = tier
+}
+
+function hasTierCustomization(tier) {
+  if (!theme.value.tiers || !theme.value.tiers[tier]) return false
+  const t = theme.value.tiers[tier]
+  return Boolean((t.html && t.html !== theme.value.html) || t.css || t.audioPath)
+}
+
+function enableTierCustomization(tier) {
+  if (!theme.value.tiers) {
+    theme.value.tiers = {}
+  }
+  if (!theme.value.tiers[tier]) {
+    theme.value.tiers[tier] = {
+      html: theme.value.html || '',
+      css: '',
+      audioPath: null
+    }
+  }
+  selectedEditingTier.value = tier
+  selectedPreviewTier.value = tier
+  showStatus(`Personnalisation activée pour le tier ${selectedEditingTierName.value} ⚡`)
+}
+
+function resetTierCustomization(tier) {
+  if (theme.value.tiers && theme.value.tiers[tier]) {
+    delete theme.value.tiers[tier]
+    showStatus(`Tier ${tier} réinitialisé : hérite désormais du modèle standard ↩`)
+  }
+}
+
+function handleEditTierFromEffects(tier) {
+  selectEditingTier(tier)
+  if (!hasTierCustomization(tier) && tier !== 'common') {
+    enableTierCustomization(tier)
+  }
+  activeTab.value = 'css'
+}
+
+const currentEditingHtml = computed({
+  get() {
+    if (selectedEditingTier.value === 'common') {
+      return theme.value.html
+    }
+    return theme.value.tiers?.[selectedEditingTier.value]?.html ?? theme.value.html
+  },
+  set(val) {
+    if (selectedEditingTier.value === 'common') {
+      theme.value.html = val
+    } else {
+      if (!theme.value.tiers) theme.value.tiers = {}
+      if (!theme.value.tiers[selectedEditingTier.value]) {
+        theme.value.tiers[selectedEditingTier.value] = {}
+      }
+      theme.value.tiers[selectedEditingTier.value].html = val
+    }
+  }
+})
+
+const currentEditingCss = computed({
+  get() {
+    if (selectedEditingTier.value === 'common') {
+      return theme.value.css
+    }
+    return theme.value.tiers?.[selectedEditingTier.value]?.css ?? ''
+  },
+  set(val) {
+    if (selectedEditingTier.value === 'common') {
+      theme.value.css = val
+    } else {
+      if (!theme.value.tiers) theme.value.tiers = {}
+      if (!theme.value.tiers[selectedEditingTier.value]) {
+        theme.value.tiers[selectedEditingTier.value] = {}
+      }
+      theme.value.tiers[selectedEditingTier.value].css = val
+    }
+  }
+})
+
+const currentEditingAudioPath = computed({
+  get() {
+    if (selectedEditingTier.value === 'common') {
+      return theme.value.audioPath
+    }
+    return theme.value.tiers?.[selectedEditingTier.value]?.audioPath ?? theme.value.audioPath
+  },
+  set(val) {
+    if (selectedEditingTier.value === 'common') {
+      theme.value.audioPath = val
+    } else {
+      if (!theme.value.tiers) theme.value.tiers = {}
+      if (!theme.value.tiers[selectedEditingTier.value]) {
+        theme.value.tiers[selectedEditingTier.value] = {}
+      }
+      theme.value.tiers[selectedEditingTier.value].audioPath = val
+    }
+  }
+})
+
+const computedPreviewCss = computed(() => {
+  const baseCss = theme.value.css || ''
+  const tierCss = (selectedPreviewTier.value !== 'common' && theme.value.tiers?.[selectedPreviewTier.value]?.css)
+    ? `\n/* Override Spécifique ${selectedPreviewTier.value.toUpperCase()} */\n` + theme.value.tiers[selectedPreviewTier.value].css
+    : ''
+  return baseCss + tierCss
 })
 
 function selectVisualEffect(fxId) {
@@ -350,7 +523,8 @@ watch(
         ...DEFAULT_THEME,
         ...JSON.parse(JSON.stringify(newTheme)),
         visualEffect: newTheme.visualEffect || 'none',
-        audioDeviceId: newTheme.audioDeviceId || 'default'
+        audioDeviceId: newTheme.audioDeviceId || 'default',
+        tiers: newTheme.tiers ? JSON.parse(JSON.stringify(newTheme.tiers)) : {}
       }
     }
   },
@@ -359,31 +533,34 @@ watch(
 
 // Calcul du HTML d'aperçu en direct avec effet visuel et tier
 const previewHtml = computed(() => {
-  if (!theme.value.html) return '<div style="color: #8b9bb4; padding: 20px;">Aucun HTML défini.</div>'
-  const tierMeta = ACHIEVEMENT_TIERS[selectedPreviewTier.value] || ACHIEVEMENT_TIERS.common
+  const activeTier = selectedPreviewTier.value
+  const htmlTemplate = (activeTier !== 'common' && theme.value.tiers?.[activeTier]?.html)
+    ? theme.value.tiers[activeTier].html
+    : theme.value.html
 
-  let html = theme.value.html
+  if (!htmlTemplate) return '<div style="color: #8b9bb4; padding: 20px;">Aucun HTML défini.</div>'
+  const tierMeta = ACHIEVEMENT_TIERS[activeTier] || ACHIEVEMENT_TIERS.common
+
+  let html = htmlTemplate
     .replace(/\{title\}/gi, tierMeta.defaultTitle)
     .replace(/\{description\}/gi, tierMeta.defaultDesc)
     .replace(/\{icon\}/gi, tierMeta.icon)
     .replace(/\{game\}/gi, tierMeta.defaultGame)
-    .replace(/\{tier\}/gi, selectedPreviewTier.value)
+    .replace(/\{tier\}/gi, activeTier)
     .replace(/\{tierLabel\}/gi, tierMeta.defaultBadge)
     .replace(/\{rarity\}/gi, tierMeta.defaultPercent + '%')
 
-  if (selectedPreviewTier.value !== 'common') {
+  if (activeTier !== 'common') {
     html = html.replace(/SUCCÈS DÉBLOQUÉ/g, tierMeta.defaultBadge)
   }
 
   return enrichAchievementHtml(html, {
-    tier: selectedPreviewTier.value,
+    tier: activeTier,
     visualEffect: theme.value.visualEffect || 'none'
   })
 })
 
 onMounted(async () => {
-  await refreshAudioDevices()
-
   if (!props.targetTheme && window.steamAPI?.getActiveTheme) {
     try {
       const active = await window.steamAPI.getActiveTheme()
@@ -392,7 +569,8 @@ onMounted(async () => {
           ...DEFAULT_THEME,
           ...active,
           visualEffect: active.visualEffect || 'none',
-          audioDeviceId: active.audioDeviceId || 'default'
+          audioDeviceId: active.audioDeviceId || 'default',
+          tiers: active.tiers ? JSON.parse(JSON.stringify(active.tiers)) : {}
         }
       }
     } catch (err) {
@@ -415,24 +593,17 @@ function autoSaveThemeName() {
   }
 }
 
-async function refreshAudioDevices() {
-  const outputs = await getAudioOutputDevices(true)
-  if (outputs.length > 0) {
-    audioDevices.value = outputs
-  }
-}
-
 function insertPlaceholder(placeholder) {
   const el = htmlTextarea.value
   if (!el) {
-    theme.value.html += placeholder
+    currentEditingHtml.value += placeholder
     return
   }
 
   const start = el.selectionStart || 0
   const end = el.selectionEnd || 0
-  const text = theme.value.html
-  theme.value.html = text.substring(0, start) + placeholder + text.substring(end)
+  const text = currentEditingHtml.value || ''
+  currentEditingHtml.value = text.substring(0, start) + placeholder + text.substring(end)
 
   setTimeout(() => {
     el.focus()
@@ -445,8 +616,8 @@ async function browseAudioFile() {
   try {
     const res = await window.steamAPI.selectAudioFile()
     if (res.success && res.filePath) {
-      theme.value.audioPath = res.filePath
-      showStatus('Fichier audio sélectionné ✔')
+      currentEditingAudioPath.value = res.filePath
+      showStatus(`Fichier audio configuré pour ${selectedEditingTierName.value} ✔`)
       await saveCustomization()
       await playTestSound()
     }
@@ -456,8 +627,8 @@ async function browseAudioFile() {
 }
 
 async function removeAudioFile() {
-  theme.value.audioPath = null
-  showStatus('Fichier audio retiré (retour au carillon par défaut)')
+  currentEditingAudioPath.value = null
+  showStatus(`Son spécifique retiré pour ${selectedEditingTierName.value}`)
   await saveCustomization()
   await playTestSound()
 }
@@ -470,9 +641,9 @@ async function playTestSound() {
     await playAchievementSound({
       soundEnabled: true,
       soundVolume: theme.value.soundVolume,
-      audioPath: theme.value.audioPath,
-      audioDeviceId: theme.value.audioDeviceId
-    })
+      audioPath: currentEditingAudioPath.value,
+      tiers: theme.value.tiers
+    }, selectedEditingTier.value)
   } catch (err) {
     console.error('[CustomizationEditor] Erreur test son:', err)
   } finally {
@@ -508,6 +679,7 @@ async function resetToDefault() {
   theme.value.html = DEFAULT_THEME.html
   theme.value.css = DEFAULT_THEME.css
   theme.value.audioPath = null
+  theme.value.tiers = {}
   await saveCustomization()
   showStatus('Structure par défaut restaurée ✔')
 }
@@ -522,7 +694,8 @@ async function triggerTierTest(tier = 'common') {
     soundEnabled: theme.value.soundEnabled,
     soundVolume: theme.value.soundVolume,
     audioPath: theme.value.audioPath,
-    audioDeviceId: theme.value.audioDeviceId
+    audioDeviceId: theme.value.audioDeviceId,
+    tiers: theme.value.tiers
   }, tier)
 
   try {
@@ -542,7 +715,8 @@ async function triggerTierTest(tier = 'common') {
           visualEffect: theme.value.visualEffect || 'none',
           audioPath: theme.value.audioPath,
           soundEnabled: theme.value.soundEnabled,
-          soundVolume: theme.value.soundVolume
+          soundVolume: theme.value.soundVolume,
+          tiers: theme.value.tiers
         }
       })
       showStatus(`Alerte test (${tierMeta.name}) diffusée 🚀`)
@@ -871,6 +1045,135 @@ function showStatus(msg) {
 .tab-badge.audio-active {
   background: rgba(168, 85, 247, 0.25);
   color: #c084fc;
+}
+
+.tab-badge.tier-badge-active {
+  background: rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+}
+
+.tier-editor-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  background: rgba(14, 20, 29, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.65rem 1.15rem;
+  margin-bottom: 0.25rem;
+}
+
+.tier-selector-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tier-icon-indicator {
+  font-size: 1.1rem;
+}
+
+.tier-selector-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #c5d4e8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tier-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tier-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #8b9bb4;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tier-select-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.tier-select-btn.common.active {
+  background: rgba(240, 195, 48, 0.15);
+  border-color: rgba(240, 195, 48, 0.6);
+  color: #ffd859;
+  box-shadow: 0 0 10px rgba(240, 195, 48, 0.2);
+}
+
+.tier-select-btn.rare.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.7);
+  color: #e9d5ff;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+}
+
+.tier-select-btn.master.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.7);
+  color: #bae6fd;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+}
+
+.tier-custom-dot {
+  font-size: 0.65rem;
+  color: #4ade80;
+}
+
+.tier-actions-extra {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-customize-tier {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-customize-tier:hover {
+  background: rgba(168, 85, 247, 0.35);
+  color: #fff;
+}
+
+.btn-reset-tier {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #9cb0c9;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-tier:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
 }
 
 .theme-actions-inline {

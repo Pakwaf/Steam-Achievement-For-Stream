@@ -1,0 +1,55 @@
+/* ========================================================
+   EFFET 4 : BRAISES INCANDESCENTES ET LAVE VOLCANIQUE
+   ======================================================== */
+
+.fx-embers {
+  position: relative;
+}
+
+.fx-embers .theme-effect-layer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 -35px 50px rgba(255, 69, 0, 0.65), 0 0 35px rgba(255, 87, 34, 0.55);
+  animation: fx-embers-glow 1.9s infinite alternate ease-in-out;
+  z-index: 8;
+}
+
+.fx-embers .theme-effect-layer::after {
+  content: '';
+  position: absolute;
+  inset: -15px;
+  background-image:
+    radial-gradient(circle at 18% 92%, #ffffff 0%, #ff5722 45%, rgba(255, 87, 34, 0) 80%),
+    radial-gradient(circle at 45% 96%, #fff275 0%, #ff3d00 50%, rgba(255, 61, 0, 0) 85%),
+    radial-gradient(circle at 74% 90%, #ffffff 0%, #ff9800 45%, rgba(255, 152, 0, 0) 80%),
+    radial-gradient(circle at 30% 70%, #ffea00 0%, #d90429 55%, rgba(217, 4, 41, 0) 80%),
+    radial-gradient(circle at 62% 65%, #ffffff 0%, #ff5722 50%, rgba(255, 87, 34, 0) 85%),
+    radial-gradient(circle at 88% 75%, #fff275 0%, #ff3d00 50%, rgba(255, 61, 0, 0) 80%),
+    radial-gradient(circle at 50% 40%, #ffea00 0%, #d90429 50%, rgba(217, 4, 41, 0) 80%);
+  background-size: 100% 100%;
+  animation: fx-super-embers-rise 2.2s infinite linear;
+  filter: drop-shadow(0 0 14px #ff5722) drop-shadow(0 0 26px rgba(255, 69, 0, 0.9));
+  z-index: 12;
+}
+
+@keyframes fx-super-embers-rise {
+  0% {
+    transform: translateY(18px) scale(0.96);
+    opacity: 0.2;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-42px) scale(1.05);
+    opacity: 0;
+    filter: drop-shadow(0 0 8px #ff3d00) blur(1.5px);
+  }
+}
+
+@keyframes fx-embers-glow {
+  0% { opacity: 0.55; }
+  100% { opacity: 1; box-shadow: inset 0 -48px 60px rgba(255, 69, 0, 0.85), 0 0 45px rgba(255, 87, 34, 0.7); }
+}

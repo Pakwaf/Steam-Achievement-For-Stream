@@ -52,9 +52,14 @@
             </div>
           </div>
           <p class="tier-desc">Succès commun débloqué par la majorité des joueurs. Style et teinte dorée classique Steam.</p>
-          <button class="btn-tier-action common" :disabled="isTesting" @click="$emit('trigger-tier-test', 'common')">
-            ▶ Tester l'alerte Standard
-          </button>
+          <div class="tier-card-actions-row">
+            <button class="btn-tier-action common" :disabled="isTesting" @click="$emit('trigger-tier-test', 'common')">
+              ▶ Tester l'alerte
+            </button>
+            <button class="btn-tier-edit-action" title="Éditer le HTML, CSS et l'Audio pour ce tier" @click="$emit('edit-tier', 'common')">
+              ✏️ Éditer ce Tier
+            </button>
+          </div>
         </div>
 
         <!-- 2. Tier Rare -->
@@ -67,9 +72,14 @@
             </div>
           </div>
           <p class="tier-desc">Débloqué par moins de 10% des joueurs mondiaux. Bordure et lueur améthyste avec arpège mystique.</p>
-          <button class="btn-tier-action rare" :disabled="isTesting" @click="$emit('trigger-tier-test', 'rare')">
-            ▶ Tester l'alerte Rare
-          </button>
+          <div class="tier-card-actions-row">
+            <button class="btn-tier-action rare" :disabled="isTesting" @click="$emit('trigger-tier-test', 'rare')">
+              ▶ Tester l'alerte
+            </button>
+            <button class="btn-tier-edit-action" title="Éditer le HTML, CSS et l'Audio pour ce tier" @click="$emit('edit-tier', 'rare')">
+              ✏️ Éditer ce Tier
+            </button>
+          </div>
         </div>
 
         <!-- 3. Tier Platine 100% -->
@@ -82,9 +92,14 @@
             </div>
           </div>
           <p class="tier-desc">Dernier succès validant 100% du jeu. Halo azur platine étincelant avec fanfare de victoire triomphante.</p>
-          <button class="btn-tier-action master" :disabled="isTesting" @click="$emit('trigger-tier-test', 'master')">
-            ▶ Tester l'alerte 100% Platine
-          </button>
+          <div class="tier-card-actions-row">
+            <button class="btn-tier-action master" :disabled="isTesting" @click="$emit('trigger-tier-test', 'master')">
+              ▶ Tester l'alerte
+            </button>
+            <button class="btn-tier-edit-action" title="Éditer le HTML, CSS et l'Audio pour ce tier" @click="$emit('edit-tier', 'master')">
+              ✏️ Éditer ce Tier
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -111,7 +126,7 @@ defineProps({
   }
 })
 
-defineEmits(['select-visual-effect', 'trigger-tier-test'])
+defineEmits(['select-visual-effect', 'trigger-tier-test', 'edit-tier'])
 </script>
 
 <style scoped>
@@ -359,5 +374,35 @@ defineEmits(['select-visual-effect', 'trigger-tier-test'])
 .btn-tier-action.master:hover:not(:disabled) {
   background: rgba(56, 189, 248, 0.35);
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+}
+
+.tier-card-actions-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.tier-card-actions-row .btn-tier-action {
+  flex: 1.2;
+}
+
+.btn-tier-edit-action {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e2e8f0;
+  padding: 0.55rem;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-tier-edit-action:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
 }
 </style>

@@ -1,12 +1,21 @@
 <template>
   <div class="audio-config-card">
+    <!-- En-tête : sélection du son pour le tier actuel -->
     <div class="audio-config-header">
       <div class="audio-status-box">
-        <span class="audio-dot" :class="{ custom: audioPath }"></span>
+        <span class="audio-dot" :class="{ custom: Boolean(audioPath) }"></span>
         <div>
-          <h4>Son de notification</h4>
+          <h4>Son de notification — {{ selectedTierName }}</h4>
           <p class="audio-sub">
-            {{ audioPath ? 'Fichier personnalisé' : 'Son standard par défaut' }}
+            <template v-if="audioPath">
+              Fichier personnalisé pour ce tier
+            </template>
+            <template v-else-if="selectedTier !== 'common' && fallbackAudioPath">
+              Hérité du thème standard : {{ fallbackAudioPath.split(/[/\\]/).pop() }}
+            </template>
+            <template v-else>
+              Carillon synthétisé natif par défaut ({{ selectedTierName }})
+            </template>
           </p>
         </div>
       </div>
@@ -18,7 +27,7 @@
         <button
           v-if="audioPath"
           class="btn-clear-audio"
-          title="Revenir au son standard"
+          title="Revenir au carillon ou au son hérité"
           @click="$emit('remove-audio-file')"
         >
           ✕ Retirer
@@ -26,8 +35,9 @@
       </div>
     </div>
 
+    <!-- Affichage du chemin du fichier configuré -->
     <div v-if="audioPath" class="audio-file-path-row">
-      <span class="path-label">Fichier :</span>
+      <span class="path-label">Fichier actif :</span>
       <code class="path-text" :title="audioPath">{{ audioPath }}</code>
     </div>
 
@@ -64,32 +74,19 @@
             :disabled="!soundEnabled"
             @click="$emit('play-test-sound')"
           >
-            {{ isPlayingSound ? '🔊 Test...' : '▶ Tester' }}
+            {{ isPlayingSound ? '🔊 Test...' : '▶ Tester ce son' }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Sélecteur de sortie audio -->
-    <div class="device-selector-card">
-      <div class="setting-item">
-        <div class="device-label-row">
-          <label class="setting-label">Sortie audio de l'application :</label>
-          <button class="btn-refresh-devices" title="Actualiser les périphériques" @click="$emit('refresh-audio-devices')">
-            🔄 Actualiser
-          </button>
-        </div>
-        <select
-          :value="audioDeviceId"
-          class="device-select"
-          @change="$emit('update:audioDeviceId', $event.target.value)"
-        >
-          <option v-for="dev in audioDevices" :key="dev.deviceId" :value="dev.deviceId">
-            {{ dev.label }}
-          </option>
-        </select>
-        <p class="device-hint">
-          Sélectionnez le canal de sortie audio souhaité (casque, Wave Link SFX, etc.).
+    <!-- Information de sortie audio globale -->
+    <div class="global-audio-notice-card">
+      <div class="notice-icon">🎧</div>
+      <div class="notice-text">
+        <p class="notice-title">Sortie audio de l'application</p>
+        <p class="notice-desc">
+          Le périphérique audio de sortie (casque, Wave Link SFX, etc.) se configure désormais de manière centralisée dans les <strong>Paramètres Généraux ⚙️</strong> de l'application.
         </p>
       </div>
     </div>
@@ -97,7 +94,7 @@
     <!-- Astuce discrète OBS Studio -->
     <div class="obs-sound-tips-card">
       <p class="tips-note">
-        💡 <strong>OBS Studio</strong> : Si vous activez <em>"Contrôler l'audio via OBS"</em> dans votre source navigateur, réglez-la sur <strong>"Surveillance et sortie"</strong> dans le Mélangeur Audio pour l'entendre dans votre casque.
+        💡 <strong>OBS Studio</strong> : Si vous cochez <em>"Contrôler l'audio via OBS"</em> dans votre source navigateur, réglez la piste sur <strong>"Surveillance et sortie"</strong> dans le Mélangeur Audio OBS pour l'entendre dans vos retours.
       </p>
     </div>
   </div>
@@ -109,6 +106,18 @@ defineProps({
     type: String,
     default: null
   },
+  fallbackAudioPath: {
+    type: String,
+    default: null
+  },
+  selectedTier: {
+    type: String,
+    default: 'common'
+  },
+  selectedTierName: {
+    type: String,
+    default: 'Standard'
+  },
   soundEnabled: {
     type: Boolean,
     default: true
@@ -116,14 +125,6 @@ defineProps({
   soundVolume: {
     type: Number,
     default: 0.8
-  },
-  audioDeviceId: {
-    type: String,
-    default: 'default'
-  },
-  audioDevices: {
-    type: Array,
-    default: () => []
   },
   isPlayingSound: {
     type: Boolean,
@@ -134,11 +135,9 @@ defineProps({
 defineEmits([
   'update:soundEnabled',
   'update:soundVolume',
-  'update:audioDeviceId',
   'browse-audio-file',
   'remove-audio-file',
-  'play-test-sound',
-  'refresh-audio-devices'
+  'play-test-sound'
 ])
 </script>
 
@@ -158,101 +157,112 @@ defineEmits([
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .audio-status-box {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .audio-dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: #a1cd44;
+  background: #66c0f4;
+  box-shadow: 0 0 10px rgba(102, 192, 244, 0.5);
 }
 
 .audio-dot.custom {
-  background: #a855f7;
-  box-shadow: 0 0 8px #a855f7;
+  background: #a1cd44;
+  box-shadow: 0 0 10px rgba(161, 205, 68, 0.6);
 }
 
 .audio-status-box h4 {
   margin: 0;
   font-size: 0.95rem;
-  color: #fff;
   font-weight: 700;
+  color: #fff;
 }
 
 .audio-sub {
-  margin: 0.15rem 0 0 0;
-  font-size: 0.75rem;
+  margin: 0.2rem 0 0 0;
+  font-size: 0.78rem;
   color: #8b9bb4;
 }
 
 .audio-file-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
 .btn-select-file {
   background: rgba(102, 192, 244, 0.15);
-  border: 1px solid rgba(102, 192, 244, 0.4);
+  border: 1px solid rgba(102, 192, 244, 0.35);
   color: #66c0f4;
-  padding: 0.45rem 0.85rem;
+  padding: 0.45rem 0.9rem;
   border-radius: 6px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-select-file:hover {
   background: rgba(102, 192, 244, 0.28);
+  border-color: #66c0f4;
+  color: #fff;
 }
 
 .btn-clear-audio {
-  background: rgba(235, 87, 87, 0.15);
-  border: 1px solid rgba(235, 87, 87, 0.35);
-  color: #ff8080;
-  padding: 0.45rem 0.75rem;
+  background: rgba(255, 75, 75, 0.15);
+  border: 1px solid rgba(255, 75, 75, 0.35);
+  color: #ff6b6b;
+  padding: 0.45rem 0.8rem;
   border-radius: 6px;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-clear-audio:hover {
-  background: rgba(235, 87, 87, 0.25);
+  background: rgba(255, 75, 75, 0.28);
+  border-color: #ff4d4d;
+  color: #fff;
 }
 
 .audio-file-path-row {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 0.5rem 0.85rem;
-  border-radius: 6px;
-  font-size: 0.78rem;
+  gap: 0.5rem;
+  overflow: hidden;
 }
 
 .path-label {
-  color: #8b9bb4;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a1cd44;
 }
 
 .path-text {
-  color: #c084fc;
-  font-family: monospace;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  font-family: monospace;
 }
 
 .audio-settings-grid {
   display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
   background: rgba(0, 0, 0, 0.2);
   padding: 1.1rem;
   border-radius: 8px;
@@ -261,20 +271,21 @@ defineEmits([
 .setting-item {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .setting-label {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #c5d4e8;
+  color: #9cb3ce;
 }
 
 .toggle-switch {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   cursor: pointer;
+  user-select: none;
 }
 
 .toggle-switch input {
@@ -349,40 +360,37 @@ input:checked + .slider::before {
   color: #66c0f4;
 }
 
-.device-selector-card {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 1.1rem;
-  border-radius: 8px;
-}
-
-.device-label-row {
+.global-audio-notice-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
 }
 
-.btn-refresh-devices {
-  background: none;
-  border: none;
-  color: #66c0f4;
-  font-size: 0.74rem;
-  cursor: pointer;
+.notice-icon {
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
-.device-select {
-  background: rgba(16, 24, 34, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  outline: none;
+.notice-text {
+  flex: 1;
 }
 
-.device-hint {
+.notice-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.notice-desc {
   margin: 0.25rem 0 0 0;
-  font-size: 0.72rem;
-  color: #7d8ea6;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.4;
 }
 
 .obs-sound-tips-card {

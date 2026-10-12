@@ -144,10 +144,34 @@ async fn simulate_achievement(
 async fn broadcast_test_achievement(
     app: AppHandle,
     state: State<'_, AppState>,
-    achievement_data: Achievement,
+    mut achievement_data: serde_json::Value,
 ) -> Result<bool, String> {
+    if achievement_data.get("unlockedAt").is_none()
+        || achievement_data["unlockedAt"]
+            .as_str()
+            .map_or(true, |s| s.is_empty())
+    {
+        achievement_data["unlockedAt"] = serde_json::json!(tracker::chrono_like_now());
+    }
+    if achievement_data.get("appId").is_none() {
+        achievement_data["appId"] = serde_json::json!("440");
+    }
+    if achievement_data.get("achievementCode").is_none() {
+        achievement_data["achievementCode"] = serde_json::json!("TF_TEST_ACHIEVEMENT");
+    }
+    if achievement_data.get("displayName").is_none() {
+        achievement_data["displayName"] = serde_json::json!("Succès Débloqué");
+    }
+    if achievement_data.get("tier").is_none() {
+        achievement_data["tier"] = serde_json::json!("common");
+    }
+
     let _ = app.emit("steam:achievement-unlocked", &achievement_data);
-    state.obs.broadcast_achievement(&achievement_data);
+    let payload = serde_json::json!({
+        "type": "ACHIEVEMENT_UNLOCKED",
+        "data": &achievement_data
+    });
+    state.obs.broadcast_raw(payload.to_string());
     Ok(true)
 }
 

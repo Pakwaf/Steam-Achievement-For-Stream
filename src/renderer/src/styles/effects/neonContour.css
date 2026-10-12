@@ -1,0 +1,64 @@
+/* ========================================================
+   EFFET 2 : CONTOUR NÉON VIBRANT ET PULSATION LASER
+   ======================================================== */
+
+.fx-neon-contour {
+  position: relative;
+}
+
+.fx-neon-contour .theme-effect-layer::before {
+  content: '';
+  position: absolute;
+  inset: -3.5px;
+  border-radius: inherit;
+  padding: 3.5px;
+  background: conic-gradient(
+    from var(--neon-angle, 0deg),
+    #ff0055 0%,
+    #ffb703 20%,
+    #00f2fe 40%,
+    #7209b7 60%,
+    #00ff87 80%,
+    #ff0055 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-super-neon-spin 2.8s linear infinite;
+  filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)) drop-shadow(0 0 28px rgba(255, 0, 85, 0.8));
+  z-index: 12;
+}
+
+.fx-neon-contour .theme-effect-layer::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 1px solid rgba(0, 242, 254, 0.45);
+  box-shadow: 0 0 28px rgba(0, 242, 254, 0.65), inset 0 0 20px rgba(255, 0, 85, 0.4);
+  animation: fx-neon-pulse-glow 1.8s infinite alternate ease-in-out;
+  pointer-events: none;
+  z-index: 9;
+}
+
+@property --neon-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes fx-super-neon-spin {
+  to { --neon-angle: 360deg; }
+}
+
+@keyframes fx-neon-pulse-glow {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.02);
+    box-shadow: 0 0 42px rgba(0, 242, 254, 0.95), inset 0 0 28px rgba(255, 0, 85, 0.6);
+  }
+}

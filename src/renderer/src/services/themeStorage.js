@@ -241,6 +241,7 @@ class ThemeStorageService {
       lib.themes[index] = {
         ...lib.themes[index],
         ...themeData,
+        tiers: themeData.tiers ? JSON.parse(JSON.stringify(themeData.tiers)) : (lib.themes[index].tiers || {}),
         updatedAt: now
       }
       updated = lib.themes[index]
@@ -251,10 +252,12 @@ class ThemeStorageService {
         name: themeData.name || `Thème ${lib.themes.length + 1}`,
         html: themeData.html || DEFAULT_THEME.html,
         css: themeData.css || DEFAULT_THEME.css,
+        visualEffect: themeData.visualEffect || 'none',
         audioPath: themeData.audioPath || null,
         audioDeviceId: themeData.audioDeviceId || 'default',
         soundEnabled: themeData.soundEnabled ?? true,
         soundVolume: typeof themeData.soundVolume === 'number' ? themeData.soundVolume : 0.8,
+        tiers: themeData.tiers ? JSON.parse(JSON.stringify(themeData.tiers)) : {},
         createdAt: now,
         updatedAt: now
       }
@@ -284,10 +287,12 @@ class ThemeStorageService {
       name: initial.name || `Nouveau Thème ${lib.themes.length + 1}`,
       html: initial.html || DEFAULT_THEME.html,
       css: initial.css || DEFAULT_THEME.css,
+      visualEffect: initial.visualEffect || 'none',
       audioPath: initial.audioPath || null,
       audioDeviceId: initial.audioDeviceId || 'default',
       soundEnabled: initial.soundEnabled ?? true,
       soundVolume: typeof initial.soundVolume === 'number' ? initial.soundVolume : 0.8,
+      tiers: initial.tiers ? JSON.parse(JSON.stringify(initial.tiers)) : {},
       createdAt: now,
       updatedAt: now
     }
@@ -408,7 +413,8 @@ class ThemeStorageService {
         css: theme.css,
         visualEffect: theme.visualEffect || 'none',
         soundEnabled: theme.soundEnabled ?? true,
-        soundVolume: theme.soundVolume ?? 0.8
+        soundVolume: theme.soundVolume ?? 0.8,
+        tiers: theme.tiers || {}
       }
     }
 
@@ -437,7 +443,8 @@ class ThemeStorageService {
         css: t.css,
         visualEffect: t.visualEffect || 'none',
         soundEnabled: t.soundEnabled ?? true,
-        soundVolume: t.soundVolume ?? 0.8
+        soundVolume: t.soundVolume ?? 0.8,
+        tiers: t.tiers || {}
       }))
     }
 
@@ -479,6 +486,7 @@ class ThemeStorageService {
         audioDeviceId: 'default',
         soundEnabled: raw.soundEnabled ?? true,
         soundVolume: typeof raw.soundVolume === 'number' ? raw.soundVolume : 0.8,
+        tiers: raw.tiers ? JSON.parse(JSON.stringify(raw.tiers)) : {},
         createdAt: now,
         updatedAt: now
       }
@@ -530,6 +538,7 @@ class ThemeStorageService {
           audioDeviceId: 'default',
           soundEnabled: item.soundEnabled ?? true,
           soundVolume: typeof item.soundVolume === 'number' ? item.soundVolume : 0.8,
+          tiers: item.tiers ? JSON.parse(JSON.stringify(item.tiers)) : {},
           createdAt: now,
           updatedAt: now
         })

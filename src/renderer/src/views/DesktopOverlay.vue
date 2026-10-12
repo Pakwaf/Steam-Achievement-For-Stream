@@ -4,6 +4,7 @@
     <component :is="'style'">
       {{ visualEffectsCss }}
       {{ activePreviewTheme?.css || currentTheme.css || DEFAULT_THEME.css }}
+      {{ currentTierOverrideCss }}
     </component>
 
     <!-- Zone de rendu plein écran pour la notification de succès sur l'écran du joueur -->
@@ -23,6 +24,7 @@ import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffec
 
 const visualEffectsCss = getVisualEffectsCss()
 const currentTheme = ref({ ...DEFAULT_THEME })
+const currentTierOverrideCss = ref('')
 const renderedHtml = ref('')
 const slotRef = ref(null)
 
@@ -84,10 +86,12 @@ function triggerAchievement(achievement) {
   // 1. Jouer le son configuré via le moteur audio adapté au Tier
   playAchievementSound(effectiveTheme, tier)
 
-  // 2. Remplacer les placeholders {title}, {description}, {icon}, {game}, {tier}, {tierLabel}
-  const tpl = (effectiveTheme.html && effectiveTheme.html.trim())
-    ? effectiveTheme.html
-    : DEFAULT_THEME.html
+  // 2. Sélection du template HTML adapté au tier (ou fallback sur le thème de base)
+  const tierHtml = effectiveTheme.tiers?.[tier]?.html
+  const baseHtml = effectiveTheme.html
+  const tpl = (tierHtml && tierHtml.trim())
+    ? tierHtml
+    : ((baseHtml && baseHtml.trim()) ? baseHtml : DEFAULT_THEME.html)
 
   let processed = replacePlaceholders(tpl, achievement)
 
@@ -97,7 +101,11 @@ function triggerAchievement(achievement) {
     visualEffect: effectiveTheme.visualEffect || 'none'
   })
 
-  // 4. Appliquer l'animation d'entrée directement sur la carte racine
+  // 4. Appliquer le CSS spécifique au tier si présent
+  const tierCss = effectiveTheme.tiers?.[tier]?.css
+  currentTierOverrideCss.value = tierCss || ''
+
+  // 5. Appliquer l'animation d'entrée directement sur la carte racine
   nextTick(() => {
     const rootNode = slotRef.value?.firstElementChild
     if (rootNode) {
@@ -107,7 +115,7 @@ function triggerAchievement(achievement) {
     }
   })
 
-  // 5. Après 5 secondes : animation de sortie puis masquage
+  // 6. Après 5 secondes : animation de sortie puis masquage
   dismissTimer = setTimeout(() => {
     const rootNode = slotRef.value?.firstElementChild
     if (rootNode) {
@@ -115,10 +123,11 @@ function triggerAchievement(achievement) {
       rootNode.classList.add('animate-leave')
     }
 
-    // 6. Fin de l'animation de sortie : nettoyage du HTML
+    // Fin de l'animation de sortie : nettoyage du HTML et des styles
     leaveTimer = setTimeout(() => {
       renderedHtml.value = ''
       activePreviewTheme.value = null
+      currentTierOverrideCss.value = ''
     }, 450)
   }, 5000)
 }
