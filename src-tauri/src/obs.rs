@@ -12,11 +12,11 @@ use axum::{
 use futures_util::{SinkExt, StreamExt};
 use std::path::PathBuf;
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering},
     Arc,
 };
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, watch, RwLock};
 use tower_http::cors::CorsLayer;
 
 pub const DEFAULT_HTML: &str = r#"<div class="custom-achievement-card">
@@ -197,17 +197,33 @@ pub const DEFAULT_CSS: &str = r#"/* Conteneur principal de la notification */
   to { opacity: 0; transform: translateY(20px) scale(0.96); }
 }"#;
 
+pub fn detect_lan_ip() -> Option<String> {
+    // Crée une socket UDP connectée sans envoyer de paquets.
+    // L'OS sélectionne automatiquement l'interface réseau locale active (LAN).
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("8.8.8.8:80").ok()?;
+    let local_addr = socket.local_addr().ok()?;
+    let ip = local_addr.ip();
+    if ip.is_loopback() || ip.is_unspecified() {
+        None
+    } else {
+        Some(ip.to_string())
+    }
+}
+
 pub struct ObsServer {
-    pub port: u16,
+    pub port: Arc<AtomicU16>,
+    pub preferred_port: Arc<AtomicU16>,
     pub is_running: Arc<AtomicBool>,
     pub connected_clients: Arc<AtomicUsize>,
     pub broadcast_tx: broadcast::Sender<String>,
+    pub shutdown_tx: Arc<RwLock<Option<watch::Sender<()>>>>,
     pub current_theme: Arc<RwLock<serde_json::Value>>,
     pub app_handle: RwLock<Option<AppHandle>>,
 }
 
 impl ObsServer {
-    pub fn new(port: u16) -> Self {
+    pub fn new(preferred_port: u16) -> Self {
         let (broadcast_tx, _) = broadcast::channel(100);
         let default_theme_json = serde_json::json!({
             "html": DEFAULT_HTML,
@@ -219,10 +235,12 @@ impl ObsServer {
         });
 
         Self {
-            port,
+            port: Arc::new(AtomicU16::new(preferred_port)),
+            preferred_port: Arc::new(AtomicU16::new(preferred_port)),
             is_running: Arc::new(AtomicBool::new(false)),
             connected_clients: Arc::new(AtomicUsize::new(0)),
             broadcast_tx,
+            shutdown_tx: Arc::new(RwLock::new(None)),
             current_theme: Arc::new(RwLock::new(default_theme_json)),
             app_handle: RwLock::new(None),
         }
@@ -230,12 +248,21 @@ impl ObsServer {
 
     pub fn get_status(&self) -> ObsStatus {
         let is_running = self.is_running.load(Ordering::Relaxed);
+        let actual_port = self.port.load(Ordering::Relaxed);
+        let pref_port = self.preferred_port.load(Ordering::Relaxed);
         let connected_clients = self.connected_clients.load(Ordering::Relaxed);
+        let has_port_conflict = actual_port != pref_port;
+        let lan_ip = detect_lan_ip();
+
         ObsStatus {
             is_running,
-            port: self.port,
+            port: actual_port,
+            preferred_port: pref_port,
+            has_port_conflict,
             connected_clients,
-            obs_url: format!("http://127.0.0.1:{}/obs", self.port),
+            obs_url: format!("http://127.0.0.1:{}/obs", actual_port),
+            obs_url_localhost: format!("http://localhost:{}/obs", actual_port),
+            obs_url_lan: lan_ip.map(|ip| format!("http://{}:{}/obs", ip, actual_port)),
         }
     }
 
@@ -292,17 +319,84 @@ impl ObsServer {
             *h = Some(app);
         }
 
-        let addr = format!("0.0.0.0:{}", self.port);
-        let listener = tokio::net::TcpListener::bind(&addr)
-            .await
-            .map_err(|e| format!("Impossible de démarrer le serveur OBS sur {}: {}", addr, e))?;
+        // Arrêt d'une éventuelle instance précédente du serveur (changement de port)
+        {
+            let mut shutdown_guard = self.shutdown_tx.write().await;
+            if let Some(tx) = shutdown_guard.take() {
+                let _ = tx.send(());
+                tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            }
+        }
 
+        let pref = self.preferred_port.load(Ordering::Relaxed);
+
+        // Liste des candidats si le port préféré est déjà occupé (ex: Streamer.bot sur 8080)
+        let mut candidates = vec![pref];
+        for offset in 1..=10 {
+            let alt = pref.saturating_add(offset);
+            if !candidates.contains(&alt) {
+                candidates.push(alt);
+            }
+        }
+        for common in [8081, 8082, 8085, 8088, 8090, 8888, 18080] {
+            if !candidates.contains(&common) {
+                candidates.push(common);
+            }
+        }
+        // Port 0 demande à l'OS n'importe quel port libre du système
+        candidates.push(0);
+
+        let mut bound_listener = None;
+        let mut final_port = pref;
+
+        for candidate in candidates {
+            let addr = format!("0.0.0.0:{}", candidate);
+            match tokio::net::TcpListener::bind(&addr).await {
+                Ok(listener) => {
+                    if let Ok(local) = listener.local_addr() {
+                        final_port = local.port();
+                    } else {
+                        final_port = candidate;
+                    }
+                    bound_listener = Some(listener);
+                    break;
+                }
+                Err(err) => {
+                    eprintln!(
+                        "[ObsServer] Port {} occupé ou indisponible ({:?}). Tentative du port suivant...",
+                        candidate, err
+                    );
+                }
+            }
+        }
+
+        let listener = bound_listener.ok_or_else(|| {
+            format!("Impossible d'allouer un port libre pour le serveur OBS (port préféré: {})", pref)
+        })?;
+
+        self.port.store(final_port, Ordering::Relaxed);
         self.is_running.store(true, Ordering::Relaxed);
+
+        if final_port != pref {
+            eprintln!(
+                "[ObsServer] ⚠️ Conflit détecté : Le port {} est déjà utilisé (ex: Streamer.bot). Bascule automatique réussie sur le port libre {} !",
+                pref, final_port
+            );
+        } else {
+            println!("[ObsServer] Serveur OBS démarré avec succès sur le port {} !", final_port);
+        }
+
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(());
+        {
+            let mut shutdown_guard = self.shutdown_tx.write().await;
+            *shutdown_guard = Some(shutdown_tx);
+        }
+
         self.notify_status_change();
 
         let state = self.clone();
 
-        let app = Router::new()
+        let router = Router::new()
             .route("/ws", get(ws_handler))
             .route("/", get(index_handler))
             .route("/obs", get(obs_html_handler))
@@ -313,8 +407,11 @@ impl ObsServer {
             .with_state(state);
 
         tokio::spawn(async move {
-            if let Err(e) = axum::serve(listener, app).await {
-                eprintln!("[ObsServer] Erreur axum::serve: {e}");
+            let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+                let _ = shutdown_rx.changed().await;
+            });
+            if let Err(e) = server.await {
+                eprintln!("[ObsServer] Serveur arrêté ou erreur: {e}");
             }
         });
 
@@ -347,7 +444,7 @@ async fn handle_socket(mut socket: WebSocket, server: Arc<ObsServer>) {
     let connected_msg = serde_json::json!({
         "type": "CONNECTED",
         "message": "Connecté au serveur OBS Steam Custom Achievements",
-        "port": server.port
+        "port": server.port.load(Ordering::Relaxed)
     });
     let _ = socket.send(Message::Text(connected_msg.to_string().into())).await;
 

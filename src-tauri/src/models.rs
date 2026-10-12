@@ -76,6 +76,42 @@ pub struct TrackerStatus {
 pub struct ObsStatus {
     pub is_running: bool,
     pub port: u16,
+    pub preferred_port: u16,
+    pub has_port_conflict: bool,
     pub connected_clients: usize,
     pub obs_url: String,
+    pub obs_url_localhost: String,
+    pub obs_url_lan: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    #[serde(default = "default_obs_port")]
+    pub obs_port: u16,
+    #[serde(default = "default_sound_enabled")]
+    pub sound_enabled: bool,
+    #[serde(default = "default_sound_volume")]
+    pub sound_volume: f32,
+    #[serde(default = "default_desktop_overlay")]
+    pub desktop_overlay_enabled: bool,
+}
+
+fn default_obs_port() -> u16 {
+    8080
+}
+
+fn default_desktop_overlay() -> bool {
+    true
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            obs_port: 8080,
+            sound_enabled: true,
+            sound_volume: 0.8,
+            desktop_overlay_enabled: true,
+        }
+    }
 }

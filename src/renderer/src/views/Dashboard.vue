@@ -314,29 +314,75 @@
                   <span class="item-badge-pill obs">OBS Studio</span>
                   <h4>Source OBS</h4>
                 </div>
-                <span class="status-indicator-pill" :class="{ active: obsStatus?.isRunning }">
-                  {{ obsStatus?.isRunning ? 'Port 8080' : 'Démarrage...' }}
-                </span>
+                <div class="obs-header-controls">
+                  <button class="btn-port-config" title="Changer le port (ex: si Streamer.bot utilise 8080)" @click="openPortModal">
+                    ⚙️ Port {{ obsStatus?.port || 8080 }}
+                  </button>
+                  <span class="status-indicator-pill" :class="{ active: obsStatus?.isRunning }">
+                    {{ obsStatus?.isRunning ? 'En ligne' : 'Démarrage...' }}
+                  </span>
+                </div>
               </div>
+
+              <!-- Bannière alerte conflit de port (ex: Streamer.bot sur 8080) -->
+              <div v-if="obsStatus?.hasPortConflict" class="obs-conflict-alert">
+                <span class="conflict-alert-icon">⚡</span>
+                <div class="conflict-alert-body">
+                  <strong>Port {{ obsStatus?.preferredPort || 8080 }} déjà utilisé</strong> (ex: Streamer.bot).
+                  <p>L'overlay a basculé automatiquement sur le port <strong>{{ obsStatus?.port }}</strong> sans perturber vos autres applications !</p>
+                </div>
+              </div>
+
               <p class="item-desc">
                 Source Navigateur à intégrer dans OBS Studio pour diffuser les succès sur votre stream :
               </p>
+
+              <!-- Lien Principal Localhost / 127.0.0.1 -->
               <div class="obs-url-container">
-                <code class="obs-url-text">{{ obsUrl }}</code>
-                <div class="obs-url-actions">
-                  <button class="btn-copy-obs" @click="copyObsUrl">
-                    {{ obsCopied ? 'Copié !' : 'Copier' }}
-                  </button>
-                  <button class="btn-test-obs" @click="openObsInBrowser" title="Tester dans le navigateur">
-                    Ouvrir ↗
-                  </button>
+                <div class="url-kind-header">
+                  <span class="url-type-tag">Local (Même PC)</span>
+                  <span class="url-type-hint">OBS installé sur ce PC</span>
+                </div>
+                <div class="url-action-bar">
+                  <code class="obs-url-text">{{ obsUrl }}</code>
+                  <div class="obs-url-actions">
+                    <button class="btn-copy-obs" @click="copyObsUrl">
+                      {{ obsCopied ? 'Copié !' : 'Copier' }}
+                    </button>
+                    <button class="btn-test-obs" @click="openObsInBrowser" title="Tester dans le navigateur">
+                      Ouvrir ↗
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div class="obs-alt-url" title="Alternative locale si nécessaire">
+
+              <!-- Vrai Lien Réseau Local (LAN IP pour Dual-PC ou OBS distant) -->
+              <div v-if="obsStatus?.obsUrlLan" class="obs-url-container lan-highlight">
+                <div class="url-kind-header">
+                  <span class="url-type-tag lan">Réseau Local (LAN / 2e PC)</span>
+                  <span class="url-type-hint">Vrai lien pour OBS sur PC de stream dédié</span>
+                </div>
+                <div class="url-action-bar">
+                  <code class="obs-url-text lan-text">{{ obsStatus.obsUrlLan }}</code>
+                  <div class="obs-url-actions">
+                    <button class="btn-copy-obs btn-copy-lan" @click="copyObsUrlLan">
+                      {{ obsLanCopied ? 'Copié !' : 'Copier' }}
+                    </button>
+                    <button class="btn-test-obs" @click="openObsLanInBrowser" title="Tester le lien LAN">
+                      Ouvrir ↗
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="obs-alt-url" title="Alternative localhost">
                 <span class="alt-label">Alternative :</span>
-                <code class="alt-code" @click="copyObsUrlLocalhost" title="Cliquer pour copier">http://localhost:8080/obs</code>
+                <code class="alt-code" @click="copyObsUrlLocalhost" title="Cliquer pour copier">
+                  {{ obsStatus?.obsUrlLocalhost || `http://localhost:${obsStatus?.port || 8080}/obs` }}
+                </code>
                 <span v-if="obsLocalhostCopied" class="copied-badge">Copié !</span>
               </div>
+
               <div class="obs-meta-stats">
                 <span>Sources connectées : <strong :class="{ 'connected-count': (obsStatus?.connectedClients || 0) > 0 }">{{ obsStatus?.connectedClients || 0 }}</strong></span>
               </div>
@@ -374,6 +420,10 @@
 
             <div class="library-header-actions">
               <span v-if="libraryStatusMessage" class="lib-status-toast">{{ libraryStatusMessage }}</span>
+              <button class="btn-restore-themes" title="Restaurer les thèmes officiels par défaut (Pokemon, Cozy, Horror, etc.)" @click="handleRestoreDefaultThemes">
+                <span class="restore-icon">↺</span>
+                <span>Restaurer par défaut</span>
+              </button>
               <button class="btn-create-theme" title="Créer un nouveau thème" @click="handleCreateNewTheme">
                 <span class="plus-icon">+</span>
                 <span>Nouveau thème</span>
@@ -618,6 +668,56 @@
           </div>
         </div>
       </div>
+
+      <!-- Modal de Configuration du Port OBS (Conflit Streamer.bot etc.) -->
+      <div v-if="showPortModal" class="api-key-modal-overlay" @click.self="closePortModal">
+        <div class="api-key-modal-card">
+          <div class="modal-card-header">
+            <div class="modal-title-group">
+              <span class="modal-key-icon">🔌</span>
+              <h3>Configuration du Port Serveur OBS</h3>
+            </div>
+            <button class="btn-close-modal" title="Fermer" @click="closePortModal">✕</button>
+          </div>
+
+          <p class="modal-desc">
+            Si une autre application comme <strong>Streamer.bot</strong> occupe le port 8080 sur votre PC, vous pouvez choisir un port dédié (ex: 8085, 8888). Le serveur basculera automatiquement et mettra à jour votre lien OBS sans redémarrer le PC.
+          </p>
+
+          <div class="apikey-input-section" style="margin-top: 1rem;">
+            <label class="apikey-label">
+              <span>Port souhaité (1024 - 65535)</span>
+            </label>
+            <div class="key-input-wrapper">
+              <input
+                v-model.number="modalPortValue"
+                type="number"
+                min="1024"
+                max="65535"
+                class="key-text-input"
+                placeholder="Ex : 8085"
+              />
+              <button class="btn-paste-key" title="Sélectionner 8085" @click="modalPortValue = 8085">
+                8085
+              </button>
+              <button class="btn-paste-key" title="Sélectionner 8888" @click="modalPortValue = 8888">
+                8888
+              </button>
+            </div>
+          </div>
+
+          <div v-if="portModalMessage" class="success-banner" style="margin-top: 1rem;">
+            <span>{{ portModalMessage }}</span>
+          </div>
+
+          <div class="modal-actions-footer">
+            <button class="btn-secondary" @click="closePortModal">Annuler</button>
+            <button class="btn-save-modal-key" :disabled="isSavingPort" @click="saveCustomPort">
+              {{ isSavingPort ? 'Application...' : 'Appliquer & Enregistrer' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -634,6 +734,7 @@ const isLoading = ref(false)
 const errorMessage = ref(null)
 const copied = ref(false)
 const obsCopied = ref(false)
+const obsLanCopied = ref(false)
 const obsLocalhostCopied = ref(false)
 const isElectron = ref(typeof window !== 'undefined' && !!window.steamAPI)
 
@@ -646,9 +747,30 @@ const showApiKeyModal = ref(false)
 const modalApiKey = ref('')
 const modalKeySuccess = ref('')
 
+// Configuration Port OBS & Préférences
+const showPortModal = ref(false)
+const modalPortValue = ref(8080)
+const portModalMessage = ref('')
+const isSavingPort = ref(false)
+const appSettings = ref({
+  obsPort: 8080,
+  soundEnabled: true,
+  soundVolume: 0.8,
+  desktopOverlayEnabled: true
+})
+
 // État du tracker, de l'OBS et des succès
 const trackerStatus = ref(null)
-const obsStatus = ref({ isRunning: true, port: 8080, connectedClients: 0 })
+const obsStatus = ref({
+  isRunning: true,
+  port: 8080,
+  preferredPort: 8080,
+  hasPortConflict: false,
+  connectedClients: 0,
+  obsUrl: 'http://127.0.0.1:8080/obs',
+  obsUrlLocalhost: 'http://localhost:8080/obs',
+  obsUrlLan: null
+})
 const obsUrl = ref('http://127.0.0.1:8080/obs')
 const activeNotification = ref(null)
 const unlockedHistory = ref([])
@@ -659,7 +781,7 @@ let obsPollInterval = null
 // État de la Bibliothèque de Thèmes (Phase 5)
 const currentView = ref('library') // 'library' | 'editor'
 const editingTheme = ref(null)
-const themeLibrary = ref({ activeThemeId: '', themes: [] })
+const themeLibrary = ref({ activeThemeId: '', deletedThemeIds: [], themes: [] })
 const libraryStatusMessage = ref('')
 
 const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
@@ -713,6 +835,19 @@ onMounted(async () => {
         if (obs) {
           obsStatus.value = obs
           if (obs.obsUrl) obsUrl.value = obs.obsUrl
+        }
+      }
+
+      // Chargement des paramètres d'application (port préféré, etc.)
+      if (window.steamAPI.getAppSettings) {
+        try {
+          const s = await window.steamAPI.getAppSettings()
+          if (s) {
+            appSettings.value = { ...appSettings.value, ...s }
+            modalPortValue.value = s.obsPort || 8080
+          }
+        } catch (e) {
+          console.warn('[Dashboard] Erreur chargement settings:', e)
         }
       }
 
@@ -863,6 +998,23 @@ async function handleDeleteTheme(theme) {
     }
   } catch (err) {
     console.error('Erreur suppression thème:', err)
+  }
+}
+
+// Restaure tous les thèmes officiels par défaut (Pokemon, Cozy, Horror, etc.)
+async function handleRestoreDefaultThemes() {
+  if (!confirm('Voulez-vous restaurer tous les thèmes officiels par défaut (Pokemon, Cozy, Horror, Dark Fantasy, Wii, etc.) ? Vos thèmes créés seront conservés.')) return
+
+  try {
+    if (window.steamAPI?.restoreDefaultThemes) {
+      const res = await window.steamAPI.restoreDefaultThemes()
+      if (res.success) {
+        themeLibrary.value = res.library
+        showLibraryStatus('Thèmes par défaut restaurés avec succès ✔')
+      }
+    }
+  } catch (err) {
+    console.error('Erreur restauration thèmes:', err)
   }
 }
 
@@ -1104,11 +1256,75 @@ function copyObsUrl() {
 }
 
 function copyObsUrlLocalhost() {
-  navigator.clipboard.writeText('http://localhost:8080/obs')
+  const localUrl = obsStatus.value?.obsUrlLocalhost || `http://localhost:${obsStatus.value?.port || 8080}/obs`
+  navigator.clipboard.writeText(localUrl)
   obsLocalhostCopied.value = true
   setTimeout(() => {
     obsLocalhostCopied.value = false
   }, 2000)
+}
+
+function copyObsUrlLan() {
+  if (obsStatus.value?.obsUrlLan) {
+    navigator.clipboard.writeText(obsStatus.value.obsUrlLan)
+    obsLanCopied.value = true
+    setTimeout(() => {
+      obsLanCopied.value = false
+    }, 2000)
+  }
+}
+
+function openObsLanInBrowser() {
+  if (obsStatus.value?.obsUrlLan) {
+    if (window.steamAPI?.openExternal) {
+      window.steamAPI.openExternal(obsStatus.value.obsUrlLan)
+    } else {
+      window.open(obsStatus.value.obsUrlLan, '_blank')
+    }
+  }
+}
+
+function openPortModal() {
+  modalPortValue.value = obsStatus.value?.preferredPort || obsStatus.value?.port || 8080
+  portModalMessage.value = ''
+  showPortModal.value = true
+}
+
+function closePortModal() {
+  showPortModal.value = false
+  portModalMessage.value = ''
+}
+
+async function saveCustomPort() {
+  const p = Number(modalPortValue.value)
+  if (!p || p < 1024 || p > 65535) {
+    alert('Veuillez entrer un numéro de port valide entre 1024 et 65535.')
+    return
+  }
+
+  isSavingPort.value = true
+  try {
+    if (window.steamAPI?.setObsPort) {
+      const updatedStatus = await window.steamAPI.setObsPort(p)
+      if (updatedStatus) {
+        obsStatus.value = updatedStatus
+        if (updatedStatus.obsUrl) obsUrl.value = updatedStatus.obsUrl
+      }
+    }
+    appSettings.value.obsPort = p
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('app_settings', JSON.stringify(appSettings.value))
+    }
+    portModalMessage.value = `Port mis à jour sur ${p} avec succès !`
+    setTimeout(() => {
+      closePortModal()
+    }, 1200)
+  } catch (err) {
+    console.error('Erreur setObsPort:', err)
+    alert('Erreur lors du changement de port: ' + err)
+  } finally {
+    isSavingPort.value = false
+  }
 }
 
 function openObsInBrowser() {
@@ -2124,15 +2340,109 @@ function onIconError(e) {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.obs-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-port-config {
+  background: rgba(102, 192, 244, 0.12);
+  color: #66c0f4;
+  border: 1px solid rgba(102, 192, 244, 0.35);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-port-config:hover {
+  background: rgba(102, 192, 244, 0.25);
+  border-color: #66c0f4;
+  color: #fff;
+}
+
+/* Bannière de détection de conflit de port */
+.obs-conflict-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(240, 195, 48, 0.12);
+  border: 1px solid rgba(240, 195, 48, 0.45);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.78rem;
+  color: #f7d56e;
+  line-height: 1.4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.conflict-alert-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.conflict-alert-body strong {
+  color: #fff;
+}
+
+.conflict-alert-body p {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.74rem;
+  color: #fce8a6;
+}
+
 .obs-url-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(102, 192, 244, 0.25);
+  transition: var(--transition-smooth);
+}
+
+.obs-url-container.lan-highlight {
+  border-color: rgba(161, 205, 68, 0.35);
+  background: rgba(15, 26, 20, 0.55);
+}
+
+.url-kind-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.url-type-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(102, 192, 244, 0.2);
+  color: #66c0f4;
+}
+
+.url-type-tag.lan {
+  background: rgba(161, 205, 68, 0.2);
+  color: #a1cd44;
+}
+
+.url-type-hint {
+  font-size: 0.7rem;
+  color: var(--steam-text-muted);
+}
+
+.url-action-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid rgba(102, 192, 244, 0.3);
 }
 
 .obs-url-text {
@@ -2140,6 +2450,10 @@ function onIconError(e) {
   font-size: 0.85rem;
   color: #66c0f4;
   word-break: break-all;
+}
+
+.obs-url-text.lan-text {
+  color: #bbf359;
 }
 
 .obs-url-actions {
@@ -2162,6 +2476,41 @@ function onIconError(e) {
 
 .btn-copy-obs:hover {
   background: #88d4ff;
+}
+
+.btn-copy-lan {
+  background: #739e1a !important;
+  color: #fff !important;
+}
+
+.btn-copy-lan:hover {
+  background: #8cb929 !important;
+}
+
+.btn-restore-themes {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #c7d5e0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-restore-themes:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.restore-icon {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .btn-test-obs {

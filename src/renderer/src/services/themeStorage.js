@@ -106,8 +106,12 @@ class ThemeStorageService {
     }
 
     if (loaded) {
-      // Vérification et ajout des thèmes par défaut manquants (ex: Frutiger Aero)
+      // Respect absolu des suppressions : ne jamais réinsérer un thème supprimé
+      const deletedIds = Array.isArray(loaded.deletedThemeIds) ? loaded.deletedThemeIds : []
       for (const builtin of BUILTIN_THEMES) {
+        if (deletedIds.includes(builtin.id)) {
+          continue // L'utilisateur a expressément supprimé ce thème
+        }
         const existsInLoaded = loaded.themes.some((t) => t.id === builtin.id)
         if (!existsInLoaded) {
           loaded.themes.push({
@@ -117,11 +121,15 @@ class ThemeStorageService {
           })
         }
       }
+      if (!Array.isArray(loaded.deletedThemeIds)) {
+        loaded.deletedThemeIds = deletedIds
+      }
       this.cachedLibrary = loaded
     } else {
       // Premier lancement : créer la bibliothèque avec tous les thèmes modulaires par défaut
       this.cachedLibrary = {
         activeThemeId: DEFAULT_THEME.id,
+        deletedThemeIds: [],
         themes: BUILTIN_THEMES.map((t) => ({
           ...t,
           createdAt: new Date().toISOString(),
@@ -245,6 +253,10 @@ class ThemeStorageService {
       lib.themes.push(updated)
     }
 
+    if (Array.isArray(lib.deletedThemeIds) && updated?.id) {
+      lib.deletedThemeIds = lib.deletedThemeIds.filter((d) => d !== updated.id)
+    }
+
     await this.persistLibrary()
 
     return {
@@ -322,7 +334,14 @@ class ThemeStorageService {
       return { success: false, error: 'Thème introuvable' }
     }
 
-    lib.themes.splice(idx, 1)
+    const removed = lib.themes.splice(idx, 1)[0]
+
+    if (!Array.isArray(lib.deletedThemeIds)) {
+      lib.deletedThemeIds = []
+    }
+    if (!lib.deletedThemeIds.includes(id)) {
+      lib.deletedThemeIds.push(id)
+    }
 
     if (lib.activeThemeId === id) {
       lib.activeThemeId = lib.themes[0].id
@@ -330,6 +349,29 @@ class ThemeStorageService {
 
     await this.persistLibrary()
 
+    return {
+      success: true,
+      deletedTheme: removed,
+      activeTheme: this.getActiveThemeSync(),
+      library: { ...lib }
+    }
+  }
+
+  async restoreDefaultThemes() {
+    const lib = await this.loadLibrary()
+    lib.deletedThemeIds = []
+    const now = new Date().toISOString()
+    for (const builtin of BUILTIN_THEMES) {
+      const exists = lib.themes.some((t) => t.id === builtin.id)
+      if (!exists) {
+        lib.themes.push({
+          ...builtin,
+          createdAt: now,
+          updatedAt: now
+        })
+      }
+    }
+    await this.persistLibrary()
     return {
       success: true,
       activeTheme: this.getActiveThemeSync(),

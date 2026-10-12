@@ -3,8 +3,9 @@ pub mod models;
 pub mod obs;
 pub mod tracker;
 
-use models::{Achievement, ObsStatus, SteamUser, TrackerStatus};
+use models::{Achievement, AppSettings, ObsStatus, SteamUser, TrackerStatus};
 use obs::ObsServer;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::RwLock;
@@ -325,6 +326,51 @@ async fn get_audio_data(
     }))
 }
 
+#[tauri::command]
+async fn get_app_settings(app: AppHandle) -> Result<AppSettings, String> {
+    let cfg = read_app_config(&app).await;
+    if let Some(settings_val) = cfg.get("settings") {
+        if let Ok(settings) = serde_json::from_value::<AppSettings>(settings_val.clone()) {
+            return Ok(settings);
+        }
+    }
+    Ok(AppSettings::default())
+}
+
+#[tauri::command]
+async fn save_app_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: AppSettings,
+) -> Result<AppSettings, String> {
+    let current_pref = state.obs.preferred_port.load(Ordering::Relaxed);
+    let port_changed = settings.obs_port != current_pref;
+
+    state.obs.preferred_port.store(settings.obs_port, Ordering::Relaxed);
+    write_app_config(&app, serde_json::json!({ "settings": &settings })).await;
+
+    if port_changed {
+        let _ = state.obs.clone().start(app.clone()).await;
+    }
+
+    Ok(settings)
+}
+
+#[tauri::command]
+async fn set_obs_port(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    port: u16,
+) -> Result<ObsStatus, String> {
+    state.obs.preferred_port.store(port, Ordering::Relaxed);
+    let mut current_settings = get_app_settings(app.clone()).await.unwrap_or_default();
+    current_settings.obs_port = port;
+    write_app_config(&app, serde_json::json!({ "settings": &current_settings })).await;
+
+    let _ = state.obs.clone().start(app.clone()).await;
+    Ok(state.obs.get_status())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let tracker = Arc::new(AchievementTracker::new());
@@ -365,6 +411,9 @@ pub fn run() {
             update_customization,
             select_audio_file,
             get_audio_data,
+            get_app_settings,
+            save_app_settings,
+            set_obs_port,
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {
@@ -396,8 +445,17 @@ pub fn run() {
             let state_key = api_key_arc.clone();
 
             tauri::async_runtime::spawn(async move {
-                // 1. Restauration de la clé API et de l'utilisateur sauvegardés
+                // 1. Restauration de la clé API, de l'utilisateur et des paramètres généraux
                 let cfg = read_app_config(&app_handle).await;
+
+                if let Some(settings_val) = cfg.get("settings") {
+                    if let Ok(settings) = serde_json::from_value::<AppSettings>(settings_val.clone()) {
+                        if settings.obs_port > 0 {
+                            obs_service.preferred_port.store(settings.obs_port, Ordering::Relaxed);
+                        }
+                    }
+                }
+
                 if let Some(k) = cfg.get("apiKey").and_then(|v| v.as_str()) {
                     let clean = k.trim().to_string();
                     if !clean.is_empty() {

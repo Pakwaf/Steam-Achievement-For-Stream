@@ -123,6 +123,7 @@ export const steamAPI = {
   createTheme: (initialData) => themeStorage.createTheme(initialData),
   duplicateTheme: (id) => themeStorage.duplicateTheme(id),
   deleteTheme: (id) => themeStorage.deleteTheme(id),
+  restoreDefaultThemes: () => themeStorage.restoreDefaultThemes(),
   onThemeLibraryUpdated: (callback) => themeStorage.onLibraryUpdated(callback),
 
   getCustomization: () => themeStorage.getActiveTheme(),
@@ -188,6 +189,36 @@ export const steamAPI = {
   saveSteamApiKey: async (key) => {
     try {
       return await invoke('save_steam_api_key', { key })
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  },
+
+  getAppSettings: async () => {
+    try {
+      return await invoke('get_app_settings')
+    } catch (err) {
+      console.warn('[steamAPI] getAppSettings error:', err)
+      return {
+        obsPort: 8080,
+        soundEnabled: true,
+        soundVolume: 0.8,
+        desktopOverlayEnabled: true
+      }
+    }
+  },
+
+  saveAppSettings: async (settings) => {
+    try {
+      return await invoke('save_app_settings', { settings })
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  },
+
+  setObsPort: async (port) => {
+    try {
+      return await invoke('set_obs_port', { port: Number(port) })
     } catch (err) {
       return { success: false, error: String(err) }
     }
