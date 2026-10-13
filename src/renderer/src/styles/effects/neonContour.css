@@ -1,5 +1,5 @@
 /* ========================================================
-   EFFET 2 : CONTOUR NÉON VIBRANT ET PULSATION LASER
+   EFFET 2 : CONTOUR NÉON SUBTIL ET PULSATION HARMONIEUSE
    ======================================================== */
 
 .fx-neon-contour {
@@ -9,23 +9,23 @@
 .fx-neon-contour .theme-effect-layer::before {
   content: '';
   position: absolute;
-  inset: -3.5px;
+  inset: -2px;
   border-radius: inherit;
-  padding: 3.5px;
+  padding: 2px;
   background: conic-gradient(
     from var(--neon-angle, 0deg),
-    #ff0055 0%,
-    #ffb703 20%,
-    #00f2fe 40%,
-    #7209b7 60%,
-    #00ff87 80%,
-    #ff0055 100%
+    rgba(255, 0, 85, 0.75) 0%,
+    rgba(255, 183, 3, 0.75) 20%,
+    rgba(0, 242, 254, 0.75) 40%,
+    rgba(114, 9, 183, 0.75) 60%,
+    rgba(0, 255, 135, 0.75) 80%,
+    rgba(255, 0, 85, 0.75) 100%
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: fx-super-neon-spin 2.8s linear infinite;
-  filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)) drop-shadow(0 0 28px rgba(255, 0, 85, 0.8));
+  animation: fx-super-neon-spin 3.4s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.45)) drop-shadow(0 0 12px rgba(255, 0, 85, 0.3));
   will-change: transform, filter;
   transform: translateZ(0);
   z-index: 12;
@@ -34,11 +34,11 @@
 .fx-neon-contour .theme-effect-layer::after {
   content: '';
   position: absolute;
-  inset: -6px;
+  inset: -4px;
   border-radius: inherit;
-  border: 1px solid rgba(0, 242, 254, 0.45);
-  box-shadow: 0 0 28px rgba(0, 242, 254, 0.65), inset 0 0 20px rgba(255, 0, 85, 0.4);
-  animation: fx-neon-pulse-glow 1.8s infinite alternate ease-in-out;
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.25), inset 0 0 10px rgba(255, 0, 85, 0.15);
+  animation: fx-neon-pulse-glow 2.2s infinite alternate ease-in-out;
   pointer-events: none;
   will-change: transform, opacity, box-shadow;
   transform: translateZ(0);
@@ -57,12 +57,12 @@
 
 @keyframes fx-neon-pulse-glow {
   0% {
-    opacity: 0.4;
-    transform: scale(0.99) translateZ(0);
+    opacity: 0.25;
+    transform: scale(0.995) translateZ(0);
   }
   100% {
-    opacity: 1;
-    transform: scale(1.02) translateZ(0);
-    box-shadow: 0 0 42px rgba(0, 242, 254, 0.95), inset 0 0 28px rgba(255, 0, 85, 0.6);
+    opacity: 0.75;
+    transform: scale(1.01) translateZ(0);
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.45), inset 0 0 14px rgba(255, 0, 85, 0.25);
   }
 }
