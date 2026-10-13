@@ -1,4 +1,4 @@
-import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
@@ -48,11 +48,20 @@ function replacePlaceholders(template, data) {
  * Isole la souscription IPC, le moteur de rendu HTML/CSS dynamique et l'animation des succès.
  */
 export function useDesktopOverlay() {
+  const visualEffectsCss = getVisualEffectsCss()
   const currentTheme = ref({ ...DEFAULT_THEME })
   const activePreviewTheme = ref(null)
   const currentTierOverrideCss = ref('')
-  const renderedHtml = ref('')
+  const sanitizedHtml = ref('')
   const slotRef = ref(null)
+
+  // CSS universel + CSS brut du thème actif + surcharges du tier (injecté via composant style)
+  const currentThemeCss = computed(() => {
+    const effectiveTheme = activePreviewTheme.value || currentTheme.value || DEFAULT_THEME
+    const baseCss = effectiveTheme.css || DEFAULT_THEME.css || ''
+    const tierCss = currentTierOverrideCss.value || ''
+    return `${visualEffectsCss}\n${baseCss}\n${tierCss}`
+  })
 
   let unsubs = []
   let dismissTimer = null
@@ -78,26 +87,25 @@ export function useDesktopOverlay() {
       ? tierHtml
       : ((baseHtml && baseHtml.trim()) ? baseHtml : DEFAULT_THEME.html)
 
+    // IMPORTANT : Remplacement des variables {title}, {description}, {icon}, {game}, {tier}, {tierLabel}, {rarity} AVANT DOMPurify
     const processed = replacePlaceholders(tpl, achievement)
 
-    // 3. Enrichir avec calque d'effets visuels et assainir contre les failles XSS
+    // 3. Enrichir avec calque d'effets visuels
     const enriched = enrichAchievementHtml(processed, {
       tier,
       visualEffect: effectiveTheme.visualEffect || 'none'
     })
 
-    // 4. CSS de surcharge du Tier & CSS du thème injecté directement via balise <style>
+    // 4. Mettre à jour le CSS du tier actif (injecté via le composant style séparé)
     const tierCss = effectiveTheme.tiers?.[tier]?.css || ''
     currentTierOverrideCss.value = tierCss
-    const themeCss = effectiveTheme.css || currentTheme.value.css || DEFAULT_THEME.css
-    const visualEffectsCss = getVisualEffectsCss()
 
-    const fullHtmlWithStyle = `<style>${visualEffectsCss}\n${themeCss}\n${tierCss}</style>${enriched}`
-    renderedHtml.value = sanitizeAchievementHtml(fullHtmlWithStyle)
+    // 5. Assainir UNIQUEMENT le HTML avec DOMPurify (aucun CSS ni balise style)
+    sanitizedHtml.value = sanitizeAchievementHtml(enriched)
 
-    // 5. Animation d'entrée appliquée sur la carte (en ignorant la balise <style>)
+    // 6. Animation d'entrée
     nextTick(() => {
-      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.lastElementChild
+      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.firstElementChild
       if (rootNode) {
         rootNode.classList.remove('animate-leave')
         void rootNode.offsetWidth
@@ -105,16 +113,16 @@ export function useDesktopOverlay() {
       }
     })
 
-    // 6. Animation de sortie après 5 secondes
+    // 7. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
-      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.lastElementChild
+      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.firstElementChild
       if (rootNode) {
         rootNode.classList.remove('animate-enter')
         rootNode.classList.add('animate-leave')
       }
 
       leaveTimer = setTimeout(() => {
-        renderedHtml.value = ''
+        sanitizedHtml.value = ''
         activePreviewTheme.value = null
         currentTierOverrideCss.value = ''
       }, 450)
@@ -166,7 +174,9 @@ export function useDesktopOverlay() {
     currentTheme,
     activePreviewTheme,
     currentTierOverrideCss,
-    renderedHtml,
+    currentThemeCss,
+    sanitizedHtml,
+    renderedHtml: sanitizedHtml,
     slotRef,
     triggerAchievement
   }

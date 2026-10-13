@@ -29,7 +29,7 @@
     </div>
 
     <!-- Style universel des effets et tiers + style du thème injecté -->
-    <component :is="'style'">
+    <component is="style" type="text/css">
       {{ visualEffectsCss }}
       {{ themeCss || '' }}
     </component>
