@@ -211,9 +211,7 @@ export function useThemeEditor(props, emit) {
       visualEffect: theme.value.visualEffect || 'none'
     })
 
-    const fullHtmlWithStyle = `<style>${computedPreviewCss.value}\n${visualEffectsCss}</style>${enriched}`
-
-    return sanitizeAchievementHtml(fullHtmlWithStyle)
+    return sanitizeAchievementHtml(enriched)
   })
 
   onMounted(async () => {

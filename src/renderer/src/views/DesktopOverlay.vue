@@ -1,33 +1,27 @@
 <template>
   <div class="desktop-overlay-container">
-    <!-- Style CSS universel (effets, tiers) + CSS utilisateur injecté dynamiquement -->
-    <component :is="'style'">
-      {{ visualEffectsCss }}
-      {{ activePreviewTheme?.css || currentTheme.css || DEFAULT_THEME.css }}
-      {{ currentTierOverrideCss }}
+    <!-- Injection du CSS de manière isolée et sécurisée -->
+    <component is="style" type="text/css">
+      {{ currentThemeCss }}
     </component>
 
-    <!-- Zone de rendu plein écran pour la notification de succès sur l'écran du joueur -->
-    <div
-      ref="slotRef"
-      class="desktop-achievement-slot"
-      v-html="renderedHtml"
-    ></div>
+    <!-- Zone de rendu fixe pour la notification de succès en bas à droite -->
+    <div class="master-overlay-container">
+      <div
+        ref="slotRef"
+        class="desktop-achievement-slot"
+        v-html="sanitizedHtml"
+      ></div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { DEFAULT_THEME } from '../utils/defaultTheme.js'
-import { getVisualEffectsCss } from '../utils/visualEffects.js'
 import { useDesktopOverlay } from '../composables/useDesktopOverlay.js'
 
-const visualEffectsCss = getVisualEffectsCss()
-
 const {
-  currentTheme,
-  activePreviewTheme,
-  currentTierOverrideCss,
-  renderedHtml,
+  currentThemeCss,
+  sanitizedHtml,
   slotRef
 } = useDesktopOverlay()
 </script>
@@ -44,18 +38,32 @@ const {
   position: relative;
 }
 
-.desktop-achievement-slot {
+.master-overlay-container {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
+  bottom: 30px;
+  right: 30px;
+  z-index: 9999;
   pointer-events: none;
-  overflow: hidden;
+}
+
+.desktop-achievement-slot {
+  pointer-events: none;
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+
+/* Neutralisation du positionnement fixe hérité du thème pour respecter le master-overlay-container */
+.master-overlay-container :deep(.custom-achievement-card),
+.master-overlay-container :deep(.cyber-achievement-card),
+.master-overlay-container :deep(.minimal-achievement-card),
+.master-overlay-container :deep(div[class*="achievement-card"]),
+.master-overlay-container :deep(div[class*="card"]) {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 !important;
 }
 </style>

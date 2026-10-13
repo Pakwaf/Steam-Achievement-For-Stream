@@ -6,23 +6,25 @@
       <span>{{ isConnected ? 'OBS Connecté (ws://127.0.0.1:8080)' : 'Connexion au serveur OBS...' }}</span>
     </div>
 
-    <!-- Style CSS utilisateur injecté dynamiquement -->
-    <component :is="'style'">
-      {{ currentTheme.css || '' }}
+    <!-- Injection du CSS de manière isolée et sécurisée -->
+    <component is="style" type="text/css">
+      {{ currentThemeCss }}
     </component>
 
-    <!-- Rendu HTML dynamique du succès avec placeholders remplacés -->
-    <div
-      v-if="isDisplaying && renderedHtml"
-      class="dynamic-achievement-wrapper"
-      :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
-      v-html="renderedHtml"
-    ></div>
+    <!-- Zone de rendu fixe pour la notification de succès en bas à droite -->
+    <div class="master-overlay-container">
+      <div
+        v-if="isDisplaying && sanitizedHtml"
+        class="dynamic-achievement-wrapper"
+        :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
+        v-html="sanitizedHtml"
+      ></div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 
 const currentTheme = ref({
@@ -34,10 +36,15 @@ const currentTheme = ref({
   soundVolume: 0.8
 })
 
+const currentThemeCss = computed(() => {
+  return currentTheme.value.css || ''
+})
+
 const isDisplaying = ref(false)
 const isEntering = ref(false)
 const isLeaving = ref(false)
-const renderedHtml = ref('')
+const sanitizedHtml = ref('')
+const renderedHtml = sanitizedHtml // alias pour rétro-compatibilité
 const isConnected = ref(false)
 const showDebugBanner = ref(true)
 
@@ -126,8 +133,7 @@ function triggerAchievement(data) {
   playNotificationSound()
 
   const cardHtml = replacePlaceholders(currentTheme.value.html, data)
-  const fullHtml = `<style>${currentTheme.value.css || ''}</style>${cardHtml}`
-  renderedHtml.value = sanitizeAchievementHtml(fullHtml)
+  sanitizedHtml.value = sanitizeAchievementHtml(cardHtml)
   isDisplaying.value = true
   isEntering.value = true
   isLeaving.value = false
@@ -139,7 +145,7 @@ function triggerAchievement(data) {
     leaveTimer = setTimeout(() => {
       isDisplaying.value = false
       isLeaving.value = false
-      renderedHtml.value = ''
+      sanitizedHtml.value = ''
     }, 400)
   }, 5000)
 }
@@ -272,5 +278,26 @@ onUnmounted(() => {
 .connected .dot {
   background: #a1cd44;
   box-shadow: 0 0 6px #a1cd44;
+}
+
+.master-overlay-container {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.master-overlay-container :deep(.custom-achievement-card),
+.master-overlay-container :deep(.cyber-achievement-card),
+.master-overlay-container :deep(.minimal-achievement-card),
+.master-overlay-container :deep(div[class*="achievement-card"]),
+.master-overlay-container :deep(div[class*="card"]) {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 !important;
 }
 </style>
