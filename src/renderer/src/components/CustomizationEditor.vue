@@ -93,7 +93,7 @@
           class="tab-btn"
           :class="{ active: activeTab === 'effects' }"
           @click="activeTab = 'effects'"
-        >
+        > 
           <span>✨ Effets & Tiers</span>
           <span v-if="theme.visualEffect && theme.visualEffect !== 'none'" class="tab-badge fx-active">Actif</span>
         </button>

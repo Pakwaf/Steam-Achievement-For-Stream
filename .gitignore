@@ -47,3 +47,6 @@ Thumbs.db
 
 # Electron specific cache
 .electron
+
+# Project recap & AI Context
+recap.md
