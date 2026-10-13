@@ -125,7 +125,9 @@ function triggerAchievement(data) {
 
   playNotificationSound()
 
-  renderedHtml.value = sanitizeAchievementHtml(replacePlaceholders(currentTheme.value.html, data))
+  const cardHtml = replacePlaceholders(currentTheme.value.html, data)
+  const fullHtml = `<style>${currentTheme.value.css || ''}</style>${cardHtml}`
+  renderedHtml.value = sanitizeAchievementHtml(fullHtml)
   isDisplaying.value = true
   isEntering.value = true
   isLeaving.value = false

@@ -2,7 +2,7 @@ import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
-import { enrichAchievementHtml } from '../utils/visualEffects.js'
+import { enrichAchievementHtml, getVisualEffectsCss } from '../utils/visualEffects.js'
 import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
@@ -85,15 +85,19 @@ export function useDesktopOverlay() {
       tier,
       visualEffect: effectiveTheme.visualEffect || 'none'
     })
-    renderedHtml.value = sanitizeAchievementHtml(enriched)
 
-    // 4. CSS de surcharge du Tier
-    const tierCss = effectiveTheme.tiers?.[tier]?.css
-    currentTierOverrideCss.value = tierCss || ''
+    // 4. CSS de surcharge du Tier & CSS du thème injecté directement via balise <style>
+    const tierCss = effectiveTheme.tiers?.[tier]?.css || ''
+    currentTierOverrideCss.value = tierCss
+    const themeCss = effectiveTheme.css || currentTheme.value.css || DEFAULT_THEME.css
+    const visualEffectsCss = getVisualEffectsCss()
 
-    // 5. Animation d'entrée
+    const fullHtmlWithStyle = `<style>${visualEffectsCss}\n${themeCss}\n${tierCss}</style>${enriched}`
+    renderedHtml.value = sanitizeAchievementHtml(fullHtmlWithStyle)
+
+    // 5. Animation d'entrée appliquée sur la carte (en ignorant la balise <style>)
     nextTick(() => {
-      const rootNode = slotRef.value?.firstElementChild
+      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.lastElementChild
       if (rootNode) {
         rootNode.classList.remove('animate-leave')
         void rootNode.offsetWidth
@@ -103,7 +107,7 @@ export function useDesktopOverlay() {
 
     // 6. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
-      const rootNode = slotRef.value?.firstElementChild
+      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.lastElementChild
       if (rootNode) {
         rootNode.classList.remove('animate-enter')
         rootNode.classList.add('animate-leave')

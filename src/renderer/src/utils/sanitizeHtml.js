@@ -9,14 +9,14 @@ const SANITIZE_CONFIG = {
     'div', 'span', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'p', 'b', 'i', 'strong', 'em', 'small', 'br', 'hr', 'ul', 'ol', 'li',
     'section', 'article', 'header', 'footer',
-    'svg', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'g', 'defs', 'use'
+    'svg', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'g', 'defs', 'use',
+    'style'
   ],
   ALLOWED_ATTR: [
     'class', 'id', 'style', 'src', 'alt', 'width', 'height', 'title',
     'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'points', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'ry', 'xmlns'
   ],
   ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$)|data:|{|%7B)/i,
-  USE_PROFILES: { html: true, svg: true },
   FORBID_ATTR: [
     'onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onmouseenter',
     'onmouseleave', 'onkeydown', 'onkeyup', 'formaction', 'srcdoc'
@@ -49,8 +49,13 @@ export function sanitizeAchievementHtml(rawHtml) {
   return rawHtml
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
     .replace(/\son\w+="[^"]*"/gi, '')
     .replace(/\son\w+='[^']*'/gi, '')
     .replace(/\son\w+=\S+/gi, '')
     .replace(/javascript:[^"'\s]*/gi, '')
 }
+
+export { DOMPurify, SANITIZE_CONFIG }
