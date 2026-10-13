@@ -93,6 +93,16 @@
               Port actif : {{ obsStatus?.port || 8080 }}
             </span>
           </div>
+
+          <div class="settings-field-row lan-field-row">
+            <label class="custom-checkbox-label">
+              <input v-model="localLanBroadcast" type="checkbox" class="styled-checkbox" />
+              <span class="checkbox-label-text">Activer la diffusion LAN pour OBS (écoute sur 0.0.0.0)</span>
+            </label>
+            <p class="field-hint-text">
+              🔒 <strong>Sécurité renforcée :</strong> Désactivé par défaut (recommandé). Laissez désactivé pour limiter l'accès strictement à votre machine (127.0.0.1). Activez uniquement si OBS tourne sur un second PC de stream sur votre réseau local.
+            </p>
+          </div>
         </div>
 
         <!-- 4. Mises à jour logicielles (Auto-Updater) -->
@@ -199,6 +209,7 @@ const localAudioSettings = ref({
   soundVolume: 0.8
 })
 const localPort = ref(8080)
+const localLanBroadcast = ref(false)
 
 watch(
   () => props.audioSettings,
@@ -219,6 +230,16 @@ watch(
 )
 
 watch(
+  () => props.obsStatus,
+  (val) => {
+    if (val) {
+      localLanBroadcast.value = Boolean(val.lanBroadcastEnabled)
+    }
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
   () => props.isOpen,
   (open) => {
     if (open) {
@@ -226,6 +247,7 @@ watch(
         localAudioSettings.value = { ...props.audioSettings }
       }
       localPort.value = props.obsPort || 8080
+      localLanBroadcast.value = Boolean(props.obsStatus?.lanBroadcastEnabled)
     }
   }
 )
@@ -233,7 +255,8 @@ watch(
 function handleSave() {
   emit('save', {
     audioSettings: { ...localAudioSettings.value },
-    obsPort: localPort.value
+    obsPort: localPort.value,
+    obsLanBroadcast: localLanBroadcast.value
   })
 }
 </script>
@@ -504,6 +527,46 @@ input:checked + .slider::before {
 .port-status-badge.conflict {
   border-color: #f0c330;
   color: #ffd644;
+}
+
+.lan-field-row {
+  margin-top: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.custom-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.styled-checkbox {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  accent-color: #66c0f4;
+}
+
+.checkbox-label-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--steam-text-main, #c6d4df);
+}
+
+.field-hint-text {
+  font-size: 0.78rem;
+  color: #8b9bb4;
+  line-height: 1.4;
+  margin: 0;
+  padding-left: 1.7rem;
+}
+
+.field-hint-text strong {
+  color: #f0c330;
 }
 
 .success-banner {

@@ -3,6 +3,7 @@ import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
 import { enrichAchievementHtml } from '../utils/visualEffects.js'
+import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 const FALLBACK_ICON = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
@@ -79,11 +80,12 @@ export function useDesktopOverlay() {
 
     const processed = replacePlaceholders(tpl, achievement)
 
-    // 3. Enrichir avec calque d'effets visuels
-    renderedHtml.value = enrichAchievementHtml(processed, {
+    // 3. Enrichir avec calque d'effets visuels et assainir contre les failles XSS
+    const enriched = enrichAchievementHtml(processed, {
       tier,
       visualEffect: effectiveTheme.visualEffect || 'none'
     })
+    renderedHtml.value = sanitizeAchievementHtml(enriched)
 
     // 4. CSS de surcharge du Tier
     const tierCss = effectiveTheme.tiers?.[tier]?.css

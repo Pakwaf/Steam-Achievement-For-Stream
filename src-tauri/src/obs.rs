@@ -17,7 +17,7 @@ use std::sync::{
 };
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{broadcast, watch, RwLock};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 pub const DEFAULT_HTML: &str = r#"<div class="custom-achievement-card">
   <div class="card-glow"></div>
@@ -220,6 +220,7 @@ pub fn detect_lan_ip() -> Option<String> {
 pub struct ObsServer {
     pub port: Arc<AtomicU16>,
     pub preferred_port: Arc<AtomicU16>,
+    pub lan_broadcast: Arc<AtomicBool>,
     pub is_running: Arc<AtomicBool>,
     pub connected_clients: Arc<AtomicUsize>,
     pub broadcast_tx: broadcast::Sender<String>,
@@ -243,6 +244,7 @@ impl ObsServer {
         Self {
             port: Arc::new(AtomicU16::new(preferred_port)),
             preferred_port: Arc::new(AtomicU16::new(preferred_port)),
+            lan_broadcast: Arc::new(AtomicBool::new(false)),
             is_running: Arc::new(AtomicBool::new(false)),
             connected_clients: Arc::new(AtomicUsize::new(0)),
             broadcast_tx,
@@ -258,7 +260,8 @@ impl ObsServer {
         let pref_port = self.preferred_port.load(Ordering::Relaxed);
         let connected_clients = self.connected_clients.load(Ordering::Relaxed);
         let has_port_conflict = actual_port != pref_port;
-        let lan_ip = detect_lan_ip();
+        let is_lan = self.lan_broadcast.load(Ordering::Relaxed);
+        let lan_ip = if is_lan { detect_lan_ip() } else { None };
 
         ObsStatus {
             is_running,
@@ -269,6 +272,7 @@ impl ObsServer {
             obs_url: format!("http://127.0.0.1:{}/obs", actual_port),
             obs_url_localhost: format!("http://localhost:{}/obs", actual_port),
             obs_url_lan: lan_ip.map(|ip| format!("http://{}:{}/obs", ip, actual_port)),
+            lan_broadcast_enabled: is_lan,
         }
     }
 
@@ -366,11 +370,14 @@ impl ObsServer {
         // Port 0 demande à l'OS n'importe quel port libre du système
         candidates.push(0);
 
+        let is_lan = self.lan_broadcast.load(Ordering::Relaxed);
+        let bind_host = if is_lan { "0.0.0.0" } else { "127.0.0.1" };
+
         let mut bound_listener = None;
         let mut final_port = pref;
 
         for candidate in candidates {
-            let addr = format!("0.0.0.0:{}", candidate);
+            let addr = format!("{}:{}", bind_host, candidate);
             match tokio::net::TcpListener::bind(&addr).await {
                 Ok(listener) => {
                     if let Ok(local) = listener.local_addr() {
@@ -416,6 +423,20 @@ impl ObsServer {
 
         let state = self.clone();
 
+        // Sécurité CORS stricte : seuls les clients locaux (loopback / WebView Tauri) sont autorisés
+        let cors = CorsLayer::new()
+            .allow_origin(AllowOrigin::predicate(|origin, _| {
+                if let Ok(s) = origin.to_str() {
+                    s.starts_with("http://127.0.0.1")
+                        || s.starts_with("http://localhost")
+                        || s.starts_with("tauri://localhost")
+                        || s.starts_with("http://tauri.localhost")
+                } else {
+                    false
+                }
+            }))
+            .allow_methods([axum::http::Method::GET]);
+
         let router = Router::new()
             .route("/ws", get(ws_handler))
             .route("/", get(index_handler))
@@ -423,7 +444,7 @@ impl ObsServer {
             .route("/obs/", get(obs_html_handler))
             .route("/audio/custom", get(audio_handler))
             .route("/api/status", get(api_status_handler))
-            .layer(CorsLayer::permissive())
+            .layer(cors)
             .with_state(state);
 
         tokio::spawn(async move {
@@ -885,9 +906,7 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       box-shadow: 0 0 30px rgba(56, 189, 248, 0.9), 0 0 15px rgba(255, 215, 0, 0.8), inset 0 0 18px rgba(56, 189, 248, 0.6) !important;
     }}
   </style>
-  <style id="custom-theme-css">
-{css}
-  </style>
+  <style id="custom-theme-css"></style>
 </head>
 <body>
   <div id="overlay-container">
@@ -905,6 +924,12 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
     const statusText = document.getElementById('status-text');
     const achSlot = document.getElementById('achievement-slot');
     const customCssElem = document.getElementById('custom-theme-css');
+
+    // Injection sécurisée du CSS initial via textContent (neutralise toute injection </style><script>)
+    const initialThemeCss = {css_json};
+    if (customCssElem && initialThemeCss) {{
+      customCssElem.textContent = initialThemeCss;
+    }}
 
     let currentHtmlTemplate = {html_template_json};
     let currentVisualEffect = {visual_effect_json};
@@ -1141,9 +1166,16 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
   </script>
 </body>
 </html>"#,
-        css = css,
-        html_template_json = serde_json::to_string(html_template).unwrap_or_default(),
-        visual_effect_json = serde_json::to_string(visual_effect).unwrap_or_default(),
+        css_json = serde_json::to_string(css)
+            .unwrap_or_default()
+            .replace("</script", "<\\/script")
+            .replace("</style", "<\\/style"),
+        html_template_json = serde_json::to_string(html_template)
+            .unwrap_or_default()
+            .replace("</script", "<\\/script"),
+        visual_effect_json = serde_json::to_string(visual_effect)
+            .unwrap_or_default()
+            .replace("</script", "<\\/script"),
         has_audio = has_audio,
         sound_enabled = sound_enabled,
         sound_volume = sound_volume
@@ -1180,20 +1212,32 @@ async fn audio_handler(
     };
 
     if let Some(path) = audio_path {
-        if path.exists() {
-            if let Ok(bytes) = tokio::fs::read(&path).await {
-                let ext = path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("mp3")
-                    .to_lowercase();
+        // Validation stricte de sécurité : l'extension DOIT impérativement être un format audio autorisé
+        let ext = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
+        if !matches!(ext.as_str(), "mp3" | "wav" | "ogg") {
+            eprintln!(
+                "[ObsServer] 🚨 Sécurité : Tentative d'accès à un fichier non-audio bloquée : {:?}",
+                path
+            );
+            return (
+                StatusCode::FORBIDDEN,
+                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+                "Accès interdit : seuls les fichiers audio (.mp3, .wav, .ogg) sont autorisés.",
+            )
+                .into_response();
+        }
+
+        // Vérifier que le chemin correspond bien à un fichier réel existant
+        if path.is_file() {
+            if let Ok(bytes) = tokio::fs::read(&path).await {
                 let mime = match ext.as_str() {
                     "wav" => "audio/wav",
                     "ogg" => "audio/ogg",
-                    "aac" => "audio/aac",
-                    "flac" => "audio/flac",
-                    "m4a" => "audio/mp4",
                     _ => "audio/mpeg",
                 };
 
@@ -1202,6 +1246,7 @@ async fn audio_handler(
                     [
                         (header::CONTENT_TYPE, mime),
                         (header::CACHE_CONTROL, "no-cache, no-store"),
+                        (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
                     ],
                     bytes,
                 )
@@ -1210,7 +1255,7 @@ async fn audio_handler(
         }
     }
 
-    (StatusCode::NOT_FOUND, "Aucun fichier audio").into_response()
+    (StatusCode::NOT_FOUND, "Aucun fichier audio valide").into_response()
 }
 
 // Handler JSON de statut API

@@ -1,6 +1,7 @@
 import { readTextFile, writeTextFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
 import { IPC_COMMANDS, STORAGE_KEYS } from '../constants/index.js'
+import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 import {
   BUILTIN_THEMES,
   DEFAULT_THEME,
@@ -24,6 +25,38 @@ export {
 
 export const DEPRECATED_THEME_IDS = ['theme-minimal', 'theme-cyberpunk', 'theme-wii', 'theme-pokemon']
 const THEMES_FILENAME = 'themes.json'
+
+/**
+ * Assainit les tiers importés en neutralisant tout chemin audio local (Arbitrary File Read)
+ * et en purifiant le template HTML contre les attaques XSS.
+ */
+function sanitizeImportedTiers(rawTiers) {
+  if (!rawTiers || typeof rawTiers !== 'object') return {}
+  const cleaned = JSON.parse(JSON.stringify(rawTiers))
+  for (const tierKey of Object.keys(cleaned)) {
+    if (cleaned[tierKey] && typeof cleaned[tierKey] === 'object') {
+      cleaned[tierKey].audioPath = null
+      if (cleaned[tierKey].html) {
+        cleaned[tierKey].html = sanitizeAchievementHtml(cleaned[tierKey].html)
+      }
+    }
+  }
+  return cleaned
+}
+
+/**
+ * Assainit les tiers exportés pour éviter de divulguer les chemins système locaux de l'utilisateur.
+ */
+function sanitizeExportedTiers(rawTiers) {
+  if (!rawTiers || typeof rawTiers !== 'object') return {}
+  const cleaned = JSON.parse(JSON.stringify(rawTiers))
+  for (const tierKey of Object.keys(cleaned)) {
+    if (cleaned[tierKey] && typeof cleaned[tierKey] === 'object') {
+      cleaned[tierKey].audioPath = null
+    }
+  }
+  return cleaned
+}
 
 class ThemeStorageService {
   constructor() {
@@ -413,9 +446,10 @@ class ThemeStorageService {
         html: theme.html,
         css: theme.css,
         visualEffect: theme.visualEffect || 'none',
+        audioPath: null,
         soundEnabled: theme.soundEnabled ?? true,
         soundVolume: theme.soundVolume ?? 0.8,
-        tiers: theme.tiers || {}
+        tiers: sanitizeExportedTiers(theme.tiers)
       }
     }
 
@@ -443,9 +477,10 @@ class ThemeStorageService {
         html: t.html,
         css: t.css,
         visualEffect: t.visualEffect || 'none',
+        audioPath: null,
         soundEnabled: t.soundEnabled ?? true,
         soundVolume: t.soundVolume ?? 0.8,
-        tiers: t.tiers || {}
+        tiers: sanitizeExportedTiers(t.tiers)
       }))
     }
 
@@ -480,14 +515,14 @@ class ThemeStorageService {
       const newTheme = {
         id: newId,
         name: baseName,
-        html: raw.html,
+        html: sanitizeAchievementHtml(raw.html),
         css: raw.css,
         visualEffect: raw.visualEffect || 'none',
         audioPath: null,
         audioDeviceId: 'default',
         soundEnabled: raw.soundEnabled ?? true,
         soundVolume: typeof raw.soundVolume === 'number' ? raw.soundVolume : 0.8,
-        tiers: raw.tiers ? JSON.parse(JSON.stringify(raw.tiers)) : {},
+        tiers: sanitizeImportedTiers(raw.tiers),
         createdAt: now,
         updatedAt: now
       }
@@ -532,14 +567,14 @@ class ThemeStorageService {
         lib.themes.push({
           id: newId,
           name: (item.name || `Importé ${count + 1}`).trim(),
-          html: item.html,
+          html: sanitizeAchievementHtml(item.html),
           css: item.css,
           visualEffect: item.visualEffect || 'none',
           audioPath: null,
           audioDeviceId: 'default',
           soundEnabled: item.soundEnabled ?? true,
           soundVolume: typeof item.soundVolume === 'number' ? item.soundVolume : 0.8,
-          tiers: item.tiers ? JSON.parse(JSON.stringify(item.tiers)) : {},
+          tiers: sanitizeImportedTiers(item.tiers),
           createdAt: now,
           updatedAt: now
         })

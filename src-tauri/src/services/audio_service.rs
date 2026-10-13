@@ -37,16 +37,24 @@ impl AudioService {
 
         if let Some(path_str) = resolved_path {
             let path = PathBuf::from(&path_str);
-            if path.exists() {
+            let ext = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+
+            if !matches!(ext.as_str(), "mp3" | "wav" | "ogg" | "aac" | "flac" | "m4a") {
+                eprintln!("[AudioService] 🚨 Extension non autorisée pour l'audio : {:?}", path);
+                return Ok(serde_json::json!({
+                    "hasAudio": false,
+                    "dataUrl": null
+                }));
+            }
+
+            if path.is_file() {
                 let bytes = tokio::fs::read(&path)
                     .await
                     .map_err(AppError::Io)?;
-
-                let ext = path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("mp3")
-                    .to_lowercase();
 
                 let mime = match ext.as_str() {
                     "wav" => "audio/wav",

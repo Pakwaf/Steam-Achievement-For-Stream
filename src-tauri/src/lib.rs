@@ -98,7 +98,11 @@ async fn save_theme_library(
 
 #[tauri::command]
 async fn open_external(url: String) -> Result<bool, String> {
-    open::that(&url).map_err(|e| format!("Impossible d'ouvrir l'URL: {e}"))?;
+    let trimmed = url.trim();
+    if !trimmed.starts_with("https://") && !trimmed.starts_with("http://") {
+        return Err("URL non autorisée : seuls les liens web HTTPS et HTTP sont acceptés pour des raisons de sécurité".to_string());
+    }
+    open::that(trimmed).map_err(|e| format!("Impossible d'ouvrir l'URL: {e}"))?;
     Ok(true)
 }
 
@@ -133,13 +137,16 @@ async fn save_app_settings(
     state: State<'_, AppState>,
     settings: AppSettings,
 ) -> Result<AppSettings, String> {
-    let current_pref = state.obs_service.get_status().preferred_port;
-    let port_changed = settings.obs_port != current_pref;
+    let current_status = state.obs_service.get_status();
+    let port_changed = settings.obs_port != current_status.preferred_port;
+    let lan_changed = settings.obs_lan_broadcast != current_status.lan_broadcast_enabled;
 
     let saved = state.config_service.save_app_settings(settings).await.map_err(|e| e.to_string())?;
 
-    if port_changed {
-        let _ = state.obs_service.set_port(saved.obs_port).await;
+    if port_changed || lan_changed {
+        state.obs_service.obs.preferred_port.store(saved.obs_port, Ordering::Relaxed);
+        state.obs_service.obs.lan_broadcast.store(saved.obs_lan_broadcast, Ordering::Relaxed);
+        let _ = state.obs_service.start().await;
     }
 
     Ok(saved)
@@ -273,6 +280,7 @@ pub fn run() {
                     if settings.obs_port > 0 {
                         obs_service_bg.obs.preferred_port.store(settings.obs_port, Ordering::Relaxed);
                     }
+                    obs_service_bg.obs.lan_broadcast.store(settings.obs_lan_broadcast, Ordering::Relaxed);
                 }
 
                 if let Ok(cfg) = config_service_bg.read_app_config().await {

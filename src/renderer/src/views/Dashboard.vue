@@ -324,7 +324,7 @@ async function testGlobalAudioOutput() {
   }
 }
 
-async function saveGeneralSettings({ audioSettings, obsPort }) {
+async function saveGeneralSettings({ audioSettings, obsPort, obsLanBroadcast }) {
   try {
     updateGlobalAudio(audioSettings)
     globalAudioSettings.value = { ...audioSettings }
@@ -332,11 +332,18 @@ async function saveGeneralSettings({ audioSettings, obsPort }) {
 
     await steamAPI.saveAppSettings({
       obsPort: obsPort || 8080,
+      obsLanBroadcast: Boolean(obsLanBroadcast),
       soundEnabled: audioSettings.soundEnabled,
       soundVolume: audioSettings.soundVolume,
       audioDeviceId: audioSettings.deviceId,
       desktopOverlayEnabled: true
     })
+
+    // Rafraîchir l'état OBS pour refléter le changement LAN éventuel
+    const updatedObs = await steamAPI.getObsStatus().catch(() => null)
+    if (updatedObs) {
+      obsStatus.value = updatedObs
+    }
 
     generalSettingsMessage.value = 'Paramètres généraux enregistrés ✔'
     setTimeout(() => {

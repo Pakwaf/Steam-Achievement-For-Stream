@@ -101,6 +101,8 @@ pub struct ObsStatus {
     pub obs_url: String,
     pub obs_url_localhost: String,
     pub obs_url_lan: Option<String>,
+    #[serde(default)]
+    pub lan_broadcast_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +118,8 @@ pub struct AppSettings {
     pub audio_device_id: Option<String>,
     #[serde(default = "default_desktop_overlay")]
     pub desktop_overlay_enabled: bool,
+    #[serde(default)]
+    pub obs_lan_broadcast: bool,
 }
 
 fn default_obs_port() -> u16 {
@@ -134,6 +138,7 @@ impl Default for AppSettings {
             sound_volume: 0.8,
             audio_device_id: None,
             desktop_overlay_enabled: true,
+            obs_lan_broadcast: false,
         }
     }
 }

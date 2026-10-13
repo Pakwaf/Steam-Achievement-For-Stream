@@ -37,6 +37,17 @@ impl ObsService {
         Ok(self.obs.get_status())
     }
 
+    pub async fn set_lan_broadcast(&self, enabled: bool) -> AppResult<ObsStatus> {
+        self.obs.lan_broadcast.store(enabled, Ordering::Relaxed);
+
+        let mut current_settings = self.config_service.get_app_settings().await.unwrap_or_default();
+        current_settings.obs_lan_broadcast = enabled;
+        self.config_service.save_app_settings(current_settings).await?;
+
+        let _ = self.obs.clone().start(self.app.clone()).await;
+        Ok(self.obs.get_status())
+    }
+
     pub fn broadcast_raw(&self, payload: String) {
         self.obs.broadcast_raw(payload);
     }
