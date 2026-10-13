@@ -12,7 +12,8 @@
     "build:win": "tauri build",
     "bump": "node scripts/bump-version.mjs patch",
     "bump:minor": "node scripts/bump-version.mjs minor",
-    "bump:major": "node scripts/bump-version.mjs major"
+    "bump:major": "node scripts/bump-version.mjs major",
+    "install-cert": "powershell -ExecutionPolicy Bypass -File scripts/install-certificate.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.3",
