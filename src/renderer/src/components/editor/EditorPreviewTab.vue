@@ -162,4 +162,19 @@ defineEmits(['update:selectedPreviewTier'])
   justify-content: center;
   width: 100%;
 }
+
+/* Neutralisation du positionnement fixe pour affichage centré dans la zone d'aperçu */
+.preview-slot :deep(.custom-achievement-card),
+.preview-slot :deep(.cyber-achievement-card),
+.preview-slot :deep(.minimal-achievement-card),
+.preview-slot :deep(div[class*="achievement-card"]),
+.preview-slot :deep(div[class*="card"]) {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 auto !important;
+  transform: none !important;
+}
 </style>
