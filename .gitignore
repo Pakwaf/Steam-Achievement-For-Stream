@@ -18,6 +18,7 @@ recap.md
 *.pub
 *.key.pub
 *.cert
+*.cer
 *.crt
 *.pfx
 *.p12
