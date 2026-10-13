@@ -193,10 +193,19 @@ export function useThemeEditor(props, emit) {
     if (!htmlTemplate) return '<div style="color: #8b9bb4; padding: 20px;">Aucun HTML défini.</div>'
     const tierMeta = ACHIEVEMENT_TIERS[activeTier] || ACHIEVEMENT_TIERS.common
 
+    let icon = (tierMeta.icon || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg').toString().trim()
+    if (icon.startsWith('http://') && (icon.includes('steamstatic.com') || icon.includes('akamaihd.net') || icon.includes('steampowered.com'))) {
+      icon = icon.replace('http://', 'https://')
+    }
+
     let html = htmlTemplate
       .replace(/\{title\}/gi, tierMeta.defaultTitle)
       .replace(/\{description\}/gi, tierMeta.defaultDesc)
-      .replace(/\{icon\}/gi, tierMeta.icon)
+      .replace(/\{icon\}/gi, icon)
+      .replace(/\{iconUrl\}/gi, icon)
+      .replace(/\{icon_url\}/gi, icon)
+      .replace(/\{image\}/gi, icon)
+      .replace(/\{img\}/gi, icon)
       .replace(/\{game\}/gi, tierMeta.defaultGame)
       .replace(/\{tier\}/gi, activeTier)
       .replace(/\{tierLabel\}/gi, tierMeta.defaultBadge)

@@ -22,15 +22,24 @@ function replacePlaceholders(template, data) {
     : (tier === ACHIEVEMENT_TIERS_KEYS.RARE ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ')
   const rarityText = data.rarityPercent ? (data.rarityPercent + '%') : (tier === ACHIEVEMENT_TIERS_KEYS.RARE ? '4.8%' : '42.5%')
 
-  const title = escapeHtml(data.displayName || 'Succès Débloqué')
-  const description = escapeHtml(data.description || '')
-  const icon = data.icon || FALLBACK_ICON
-  const game = escapeHtml(data.gameName || 'Steam')
+  const title = escapeHtml(data.displayName || data.title || data.name || 'Succès Débloqué')
+  const description = escapeHtml(data.description || data.desc || '')
+  let icon = (data.icon || data.iconUrl || data.icon_url || data.iconPath || FALLBACK_ICON).toString().trim()
+  if (!icon) icon = FALLBACK_ICON
+  if (icon.startsWith('http://') && (icon.includes('steamstatic.com') || icon.includes('akamaihd.net') || icon.includes('steampowered.com'))) {
+    icon = icon.replace('http://', 'https://')
+  }
+
+  const game = escapeHtml(data.gameName || data.game || data.game_name || 'Steam')
 
   let html = template
     .replace(/\{title\}/gi, title)
     .replace(/\{description\}/gi, description)
     .replace(/\{icon\}/gi, icon)
+    .replace(/\{iconUrl\}/gi, icon)
+    .replace(/\{icon_url\}/gi, icon)
+    .replace(/\{image\}/gi, icon)
+    .replace(/\{img\}/gi, icon)
     .replace(/\{game\}/gi, game)
     .replace(/\{tier\}/gi, tier)
     .replace(/\{tierLabel\}/gi, defaultBadge)
@@ -55,6 +64,23 @@ export function useDesktopOverlay() {
   const sanitizedHtml = ref('')
   const slotRef = ref(null)
 
+  const currentTier = ref(ACHIEVEMENT_TIERS_KEYS.COMMON)
+  const currentFx = ref('none')
+  const isEntering = ref(false)
+  const isLeaving = ref(false)
+
+  const tierClass = computed(() => {
+    return currentTier.value === ACHIEVEMENT_TIERS_KEYS.MASTER
+      ? 'tier-master'
+      : (currentTier.value === ACHIEVEMENT_TIERS_KEYS.RARE ? 'tier-rare' : 'tier-common')
+  })
+
+  const fxClass = computed(() => {
+    return currentFx.value && currentFx.value !== 'none'
+      ? `fx-${currentFx.value.replace(/_/g, '-')}`
+      : ''
+  })
+
   // CSS universel + CSS brut du thème actif + surcharges du tier (injecté via composant style)
   const currentThemeCss = computed(() => {
     const effectiveTheme = activePreviewTheme.value || currentTheme.value || DEFAULT_THEME
@@ -76,6 +102,8 @@ export function useDesktopOverlay() {
     activePreviewTheme.value = achievement.previewTheme || null
 
     const tier = achievement.tier || ACHIEVEMENT_TIERS_KEYS.COMMON
+    currentTier.value = tier
+    currentFx.value = effectiveTheme.visualEffect || 'none'
 
     // 1. Jouer le son
     playAchievementSound(effectiveTheme, tier)
@@ -104,6 +132,8 @@ export function useDesktopOverlay() {
     sanitizedHtml.value = sanitizeAchievementHtml(enriched)
 
     // 6. Animation d'entrée
+    isEntering.value = true
+    isLeaving.value = false
     nextTick(() => {
       const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.firstElementChild
       if (rootNode) {
@@ -115,6 +145,8 @@ export function useDesktopOverlay() {
 
     // 7. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
+      isEntering.value = false
+      isLeaving.value = true
       const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.firstElementChild
       if (rootNode) {
         rootNode.classList.remove('animate-enter')
@@ -125,6 +157,9 @@ export function useDesktopOverlay() {
         sanitizedHtml.value = ''
         activePreviewTheme.value = null
         currentTierOverrideCss.value = ''
+        isLeaving.value = false
+        currentTier.value = ACHIEVEMENT_TIERS_KEYS.COMMON
+        currentFx.value = 'none'
       }, 450)
     }, 5000)
   }
@@ -173,6 +208,12 @@ export function useDesktopOverlay() {
   return {
     currentTheme,
     activePreviewTheme,
+    currentTier,
+    currentFx,
+    tierClass,
+    fxClass,
+    isEntering,
+    isLeaving,
     currentTierOverrideCss,
     currentThemeCss,
     sanitizedHtml,

@@ -177,4 +177,15 @@ defineEmits(['update:selectedPreviewTier'])
   margin: 0 auto !important;
   transform: none !important;
 }
+
+/* Protection des dimensions d'icône dans l'aperçu */
+.preview-slot :deep(img),
+.preview-slot :deep(.ach-icon),
+.preview-slot :deep(.mini-icon),
+.preview-slot :deep(.cyber-icon) {
+  max-width: 64px !important;
+  max-height: 64px !important;
+  object-fit: cover !important;
+  border-radius: 10px !important;
+}
 </style>

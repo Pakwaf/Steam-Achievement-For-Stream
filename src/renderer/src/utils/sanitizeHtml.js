@@ -16,7 +16,7 @@ const SANITIZE_CONFIG = {
     'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'points', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'ry', 'xmlns'
   ],
   ADD_URI_SAFE_ATTR: ['src'],
-  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$)|data:|{|%7B)/i,
+  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|asset|tauri):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$)|data:|blob:|\/|\.\/|\.\.\/|{|%7B)/i,
   FORBID_ATTR: [
     'onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onmouseenter',
     'onmouseleave', 'onkeydown', 'onkeyup', 'formaction', 'srcdoc'

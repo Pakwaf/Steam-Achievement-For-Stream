@@ -87,6 +87,13 @@ const srcDoc = computed(() => {
       transform: none !important;
     }
 
+    img, .ach-icon, .mini-icon, .cyber-icon {
+      max-width: 64px !important;
+      max-height: 64px !important;
+      object-fit: cover !important;
+      border-radius: 8px !important;
+    }
+
     ${props.css || ''}
   </style>
 </head>
