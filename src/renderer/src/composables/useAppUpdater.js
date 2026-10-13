@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, shallowRef, toRaw } from 'vue'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
@@ -34,7 +34,9 @@ if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
 // État partagé en singleton au niveau du module
 const status = ref(UPDATER_STATUS.IDLE)
 const updateInfo = ref(null)
-const updateResource = ref(null)
+// Instance native brute non proxyfiée pour préserver l'accès aux champs privés de Tauri Resource
+let rawUpdateHandle = null
+const updateResource = shallowRef(null)
 const downloadProgress = ref(0)
 const downloadedBytes = ref(0)
 const totalBytes = ref(0)
@@ -90,6 +92,7 @@ export function useAppUpdater() {
       const update = await check()
 
       if (update) {
+        rawUpdateHandle = update
         updateResource.value = update
         const cleanNextVersion = cleanVersion(update.version)
         const cleanCurrVersion = cleanVersion(update.currentVersion) || currentAppVersion.value
@@ -105,6 +108,7 @@ export function useAppUpdater() {
         showUpdateModal.value = true
         return update
       } else {
+        rawUpdateHandle = null
         updateResource.value = null
         updateInfo.value = null
         status.value = UPDATER_STATUS.UP_TO_DATE
@@ -129,7 +133,8 @@ export function useAppUpdater() {
    * Télécharge la mise à jour, l'installe et redémarre l'application.
    */
   async function downloadAndInstall() {
-    if (!updateResource.value || isDownloading.value) return
+    const activeUpdate = rawUpdateHandle || (updateResource.value ? toRaw(updateResource.value) : null)
+    if (!activeUpdate || isDownloading.value) return
 
     status.value = UPDATER_STATUS.DOWNLOADING
     downloadProgress.value = 0
@@ -142,7 +147,7 @@ export function useAppUpdater() {
       let currentDownloaded = 0
       let currentTotal = 0
 
-      await updateResource.value.downloadAndInstall((event) => {
+      await activeUpdate.downloadAndInstall((event) => {
         if (!event) return
 
         switch (event.event) {
