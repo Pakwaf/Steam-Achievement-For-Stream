@@ -33,28 +33,29 @@
     rgba(255, 180, 0, 0.4) 68%,
     transparent 82%
   );
-  transform: rotate(26deg);
+  transform: rotate(26deg) translateZ(0);
   animation: fx-super-shimmer-sweep 2.5s infinite ease-in-out;
   pointer-events: none;
   filter: drop-shadow(0 0 18px rgba(255, 215, 0, 0.95));
   mix-blend-mode: screen;
+  will-change: transform, opacity;
   z-index: 15;
 }
 
 @keyframes fx-super-shimmer-sweep {
   0% {
-    transform: translateX(-160%) rotate(26deg);
+    transform: translateX(-160%) rotate(26deg) translateZ(0);
     opacity: 0.1;
   }
   15% {
     opacity: 1;
   }
   45% {
-    transform: translateX(160%) rotate(26deg);
+    transform: translateX(160%) rotate(26deg) translateZ(0);
     opacity: 1;
   }
   46%, 100% {
-    transform: translateX(160%) rotate(26deg);
+    transform: translateX(160%) rotate(26deg) translateZ(0);
     opacity: 0;
   }
 }

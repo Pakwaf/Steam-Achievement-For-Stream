@@ -9,7 +9,7 @@
 @import './cyberGlitch.css';
 @import './tiers.css';
 
-/* Calque universel obligatoire injecté sur les cartes de succès */
+/* Calque universel obligatoire injecté sur les cartes de succès (accélération GPU 60 FPS) */
 .theme-effect-layer {
   position: absolute;
   inset: 0;
@@ -17,4 +17,7 @@
   border-radius: inherit;
   overflow: hidden;
   z-index: 10;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
 }

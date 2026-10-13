@@ -181,10 +181,16 @@ pub const DEFAULT_CSS: &str = r#"/* Conteneur principal de la notification */
 
 .animate-enter {
   animation: ach-slide-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .animate-leave {
   animation: ach-slide-out 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 @keyframes ach-slide-in {
@@ -616,6 +622,9 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       border-radius: inherit;
       overflow: hidden;
       z-index: 10;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      will-change: transform, opacity;
     }}
 
     /* 1. Étoiles Scintillantes */
@@ -641,18 +650,20 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       background-repeat: no-repeat;
       filter: drop-shadow(0 0 10px #ffd700) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
       animation: fx-obs-stars 2.2s infinite ease-in-out alternate;
+      will-change: transform, opacity;
+      transform: translateZ(0);
       z-index: 10;
     }}
     .fx-stars .theme-effect-layer::after {{
       animation-delay: -1.1s;
       animation-duration: 2.6s;
-      transform: rotate(180deg) scale(0.95);
+      transform: rotate(180deg) scale(0.95) translateZ(0);
       filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 16px rgba(112, 214, 255, 0.9));
     }}
     @keyframes fx-obs-stars {{
-      0% {{ opacity: 0.35; transform: scale(0.94); }}
-      50% {{ opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 14px #ffd700) drop-shadow(0 0 28px rgba(255, 215, 0, 0.95)); }}
-      100% {{ opacity: 0.45; transform: scale(0.98); }}
+      0% {{ opacity: 0.35; transform: scale(0.94) translateZ(0); }}
+      50% {{ opacity: 1; transform: scale(1.05) translateZ(0); filter: drop-shadow(0 0 14px #ffd700) drop-shadow(0 0 28px rgba(255, 215, 0, 0.95)); }}
+      100% {{ opacity: 0.45; transform: scale(0.98) translateZ(0); }}
     }}
 
     /* 2. Contour Néon */
@@ -671,6 +682,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       mask-composite: exclude;
       animation: fx-obs-neon-spin 2.8s linear infinite;
       filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)) drop-shadow(0 0 28px rgba(255, 0, 85, 0.8));
+      will-change: transform, filter;
+      transform: translateZ(0);
       z-index: 12;
     }}
     .fx-neon-contour .theme-effect-layer::after {{
@@ -682,6 +695,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       box-shadow: 0 0 28px rgba(0, 242, 254, 0.65), inset 0 0 20px rgba(255, 0, 85, 0.4);
       animation: fx-obs-neon-pulse 1.8s infinite alternate ease-in-out;
       pointer-events: none;
+      will-change: transform, opacity, box-shadow;
+      transform: translateZ(0);
       z-index: 9;
     }}
     @keyframes fx-obs-neon-spin {{
@@ -689,8 +704,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       100% {{ filter: hue-rotate(360deg) drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)); }}
     }}
     @keyframes fx-obs-neon-pulse {{
-      0% {{ opacity: 0.4; transform: scale(0.99); }}
-      100% {{ opacity: 1; transform: scale(1.02); box-shadow: 0 0 42px rgba(0, 242, 254, 0.95), inset 0 0 28px rgba(255, 0, 85, 0.6); }}
+      0% {{ opacity: 0.4; transform: scale(0.99) translateZ(0); }}
+      100% {{ opacity: 1; transform: scale(1.02) translateZ(0); box-shadow: 0 0 42px rgba(0, 242, 254, 0.95), inset 0 0 28px rgba(255, 0, 85, 0.6); }}
     }}
 
     /* 3. Shimmer Doré Balayant */
@@ -723,18 +738,19 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         rgba(255, 180, 0, 0.4) 68%,
         transparent 82%
       );
-      transform: rotate(26deg);
+      transform: rotate(26deg) translateZ(0);
       animation: fx-obs-shimmer 2.5s infinite ease-in-out;
       pointer-events: none;
       filter: drop-shadow(0 0 18px rgba(255, 215, 0, 0.95));
       mix-blend-mode: screen;
+      will-change: transform, opacity;
       z-index: 15;
     }}
     @keyframes fx-obs-shimmer {{
-      0% {{ transform: translateX(-160%) rotate(26deg); opacity: 0.1; }}
+      0% {{ transform: translateX(-160%) rotate(26deg) translateZ(0); opacity: 0.1; }}
       15% {{ opacity: 1; }}
-      45% {{ transform: translateX(160%) rotate(26deg); opacity: 1; }}
-      46%, 100% {{ transform: translateX(160%) rotate(26deg); opacity: 0; }}
+      45% {{ transform: translateX(160%) rotate(26deg) translateZ(0); opacity: 1; }}
+      46%, 100% {{ transform: translateX(160%) rotate(26deg) translateZ(0); opacity: 0; }}
     }}
 
     /* 4. Braises Flottantes */
@@ -748,6 +764,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       border-radius: inherit;
       box-shadow: inset 0 -35px 50px rgba(255, 69, 0, 0.65), 0 0 35px rgba(255, 87, 34, 0.55);
       animation: fx-obs-embers-glow 1.9s infinite alternate ease-in-out;
+      will-change: opacity, box-shadow;
+      transform: translateZ(0);
       z-index: 8;
     }}
     .fx-embers .theme-effect-layer::after {{
@@ -765,12 +783,14 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       background-size: 100% 100%;
       animation: fx-obs-embers-rise 2.2s infinite linear;
       filter: drop-shadow(0 0 14px #ff5722) drop-shadow(0 0 26px rgba(255, 69, 0, 0.9));
+      will-change: transform, opacity;
+      transform: translateZ(0);
       z-index: 12;
     }}
     @keyframes fx-obs-embers-rise {{
-      0% {{ transform: translateY(18px) scale(0.96); opacity: 0.2; }}
+      0% {{ transform: translateY(18px) scale(0.96) translateZ(0); opacity: 0.2; }}
       35% {{ opacity: 1; }}
-      100% {{ transform: translateY(-42px) scale(1.05); opacity: 0; filter: drop-shadow(0 0 8px #ff3d00) blur(1.5px); }}
+      100% {{ transform: translateY(-42px) scale(1.05) translateZ(0); opacity: 0; filter: drop-shadow(0 0 8px #ff3d00) blur(1.5px); }}
     }}
     @keyframes fx-obs-embers-glow {{
       0% {{ opacity: 0.55; }}
@@ -791,6 +811,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         0 0 35px rgba(0, 242, 254, 0.85),
         0 0 60px rgba(247, 37, 133, 0.6);
       animation: fx-obs-cyber-pulse 1.8s infinite alternate ease-in-out;
+      will-change: transform, opacity, box-shadow;
+      transform: translateZ(0);
       z-index: 10;
     }}
     .fx-cyber-glitch .theme-effect-layer::after {{
@@ -808,15 +830,17 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
       animation: fx-obs-scanline 2.8s linear infinite;
       pointer-events: none;
       mix-blend-mode: overlay;
+      will-change: transform;
+      transform: translateZ(0);
       z-index: 12;
     }}
     @keyframes fx-obs-cyber-pulse {{
-      0% {{ opacity: 0.45; transform: scale(0.99); }}
-      100% {{ opacity: 1; transform: scale(1.015); box-shadow: inset 0 0 50px rgba(0, 242, 254, 0.85), 0 0 52px rgba(0, 242, 254, 1), 0 0 75px rgba(247, 37, 133, 0.8); }}
+      0% {{ opacity: 0.45; transform: scale(0.99) translateZ(0); }}
+      100% {{ opacity: 1; transform: scale(1.015) translateZ(0); box-shadow: inset 0 0 50px rgba(0, 242, 254, 0.85), 0 0 52px rgba(0, 242, 254, 1), 0 0 75px rgba(247, 37, 133, 0.8); }}
     }}
     @keyframes fx-obs-scanline {{
-      0% {{ transform: translateY(-100%); }}
-      100% {{ transform: translateY(100%); }}
+      0% {{ transform: translateY(-100%) translateZ(0); }}
+      100% {{ transform: translateY(100%) translateZ(0); }}
     }}
 
     /* Tier Rare (< 10%) */

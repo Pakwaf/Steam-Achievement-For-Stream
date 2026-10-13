@@ -1,6 +1,7 @@
 @import '../styles/effects/index.css';
 
 :root {
+  /* Arrière-plans & Cartes */
   --bg-primary: #0b0e14;
   --bg-secondary: #121822;
   --bg-card: rgba(22, 32, 47, 0.7);
@@ -8,6 +9,7 @@
   --border-color: rgba(102, 192, 244, 0.15);
   --border-color-active: rgba(102, 192, 244, 0.4);
   
+  /* Palette Steam */
   --steam-blue: #66c0f4;
   --steam-blue-dark: #1999e3;
   --steam-accent: #00adee;
@@ -17,10 +19,22 @@
   --steam-online: #57cbde;
   --steam-in-game: #a1cd44;
   
+  /* Tokens Rareté (Tiers) */
+  --tier-rare-color: #a855f7;
+  --tier-rare-bg: rgba(168, 85, 247, 0.35);
+  --tier-rare-glow: 0 0 38px rgba(168, 85, 247, 0.65);
+  --tier-master-color: #38bdf8;
+  --tier-master-gold: #ffd700;
+  --tier-master-glow: 0 0 50px rgba(56, 189, 248, 0.85);
+
+  /* Typographie & Transitions */
   --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   --shadow-card: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
   --glow-blue: 0 0 25px rgba(102, 192, 244, 0.25);
+
+  /* Accélération Matérielle GPU (60 FPS Overlay & OBS) */
+  --gpu-layer: translateZ(0);
 }
 
 * {
@@ -79,3 +93,15 @@ body.transparent-view #app {
   min-height: 100vh;
 }
 
+/* ========================================================
+   ACCÉLÉRATION MATÉRIELLE GPU UNIVERSELLE POUR OVERLAYS
+   ======================================================== */
+.theme-effect-layer,
+.theme-effect-layer::before,
+.theme-effect-layer::after,
+.animate-enter,
+.animate-leave {
+  backface-visibility: hidden;
+  transform: var(--gpu-layer);
+  will-change: transform, opacity;
+}

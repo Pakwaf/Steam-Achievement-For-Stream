@@ -26,6 +26,8 @@
   mask-composite: exclude;
   animation: fx-super-neon-spin 2.8s linear infinite;
   filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.95)) drop-shadow(0 0 28px rgba(255, 0, 85, 0.8));
+  will-change: transform, filter;
+  transform: translateZ(0);
   z-index: 12;
 }
 
@@ -38,6 +40,8 @@
   box-shadow: 0 0 28px rgba(0, 242, 254, 0.65), inset 0 0 20px rgba(255, 0, 85, 0.4);
   animation: fx-neon-pulse-glow 1.8s infinite alternate ease-in-out;
   pointer-events: none;
+  will-change: transform, opacity, box-shadow;
+  transform: translateZ(0);
   z-index: 9;
 }
 
@@ -54,11 +58,11 @@
 @keyframes fx-neon-pulse-glow {
   0% {
     opacity: 0.4;
-    transform: scale(0.99);
+    transform: scale(0.99) translateZ(0);
   }
   100% {
     opacity: 1;
-    transform: scale(1.02);
+    transform: scale(1.02) translateZ(0);
     box-shadow: 0 0 42px rgba(0, 242, 254, 0.95), inset 0 0 28px rgba(255, 0, 85, 0.6);
   }
 }

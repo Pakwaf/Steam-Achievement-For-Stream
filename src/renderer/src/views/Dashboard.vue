@@ -152,10 +152,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 
-// Composants du Dashboard
-import CustomizationEditor from '../components/CustomizationEditor.vue'
+// Composants synchrones de base du Dashboard
 import AchievementToast from '../components/dashboard/AchievementToast.vue'
 import AppHeader from '../components/dashboard/AppHeader.vue'
 import AuthSection from '../components/dashboard/AuthSection.vue'
@@ -164,9 +163,12 @@ import DisplaySystemsCard from '../components/dashboard/DisplaySystemsCard.vue'
 import TrackerCard from '../components/dashboard/TrackerCard.vue'
 import AchievementHistory from '../components/dashboard/AchievementHistory.vue'
 import ThemeStudioGallery from '../components/studio/ThemeStudioGallery.vue'
-import ApiKeyModal from '../components/modals/ApiKeyModal.vue'
-import PortModal from '../components/modals/PortModal.vue'
-import GeneralSettingsModal from '../components/modals/GeneralSettingsModal.vue'
+
+// Composants asynchrones chargés à la demande (Lazy Loading pour réduire le bundle)
+const CustomizationEditor = defineAsyncComponent(() => import('../components/CustomizationEditor.vue'))
+const ApiKeyModal = defineAsyncComponent(() => import('../components/modals/ApiKeyModal.vue'))
+const PortModal = defineAsyncComponent(() => import('../components/modals/PortModal.vue'))
+const GeneralSettingsModal = defineAsyncComponent(() => import('../components/modals/GeneralSettingsModal.vue'))
 
 // Composables métier isolés
 import { useSteamTracker } from '../composables/useSteamTracker.js'

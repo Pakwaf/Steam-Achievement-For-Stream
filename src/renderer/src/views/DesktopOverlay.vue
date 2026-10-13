@@ -54,5 +54,8 @@ const {
   padding: 0;
   pointer-events: none;
   overflow: hidden;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 </style>
