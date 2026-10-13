@@ -1,5 +1,44 @@
-# Logs
-logs
+# ==============================================================================
+# SteamOverlayStream - .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Project Recap & AI Context (Confidentialité - Règle d'architecture)
+# ------------------------------------------------------------------------------
+recap.md
+
+# ------------------------------------------------------------------------------
+# 2. Secrets, API Keys & Environment Variables
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*.keystore
+*.jks
+tauri.key
+
+# ------------------------------------------------------------------------------
+# 3. Node & Frontend Dependencies & Caches
+# ------------------------------------------------------------------------------
+node_modules/
+.pnp/
+.pnp.js
+.vite/
+.cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# ------------------------------------------------------------------------------
+# 4. Logs & Debugging
+# ------------------------------------------------------------------------------
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,46 +46,103 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Node dependencies
-node_modules
-.pnp
-.pnp.js
-
-# Build and Bundles
-dist
-dist-ssr
-out
-release
-target
-src-tauri/target
+# ------------------------------------------------------------------------------
+# 5. Build Outputs, Bundles & Distributables
+# ------------------------------------------------------------------------------
+dist/
+dist-ssr/
+out/
+build/
+release/
 *.local
 
-# Editor directories and files
+# ------------------------------------------------------------------------------
+# 6. Rust & Tauri Compilations & Intermediate Files
+# ------------------------------------------------------------------------------
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/gen/android/
+src-tauri/gen/ios/
+**/*.rs.bk
+
+# Binaires compilés, installateurs et bases de symboles de débogage
+*.exe
+*.msi
+*.dll
+*.so
+*.dylib
+*.pdb
+*.wixobj
+*.wixpdb
+*.appimage
+*.deb
+*.rpm
+
+# Crash dumps
+*.dmp
+*.dump
+*.stackdump
+
+# ------------------------------------------------------------------------------
+# 7. IDE, Éditeurs de code & Espaces AI
+# ------------------------------------------------------------------------------
+# Visual Studio Code
 .vscode/*
 !.vscode/extensions.json
-.idea
+
+# JetBrains (IntelliJ, WebStorm, CLion, RustRover)
+.idea/
+*.iml
+*.iws
+
+# Visual Studio
 *.suo
 *.ntvs*
 *.njsproj
-*.sln
-*.sw?
+*.sln.docstates
+*.user
+*.userosv
 
-# OS generated files
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim / Emacs
+*.sw?
+.*.sw?
+*~
+#*#
+
+# Environnements d'assistants IA et caches IDE
+.gemini/
+.antigravity/
+.system_generated/
+
+# ------------------------------------------------------------------------------
+# 8. Système d'Exploitation (OS)
+# ------------------------------------------------------------------------------
+# Windows
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
 
-# Environment variables & secrets
-.env
-.env.*
-!.env.example
-
-# Electron specific cache
-.electron
-
-# Project recap & AI Context
-recap.md
+# ------------------------------------------------------------------------------
+# 9. Données locales d'exécution & Fichiers temporaires
+# ------------------------------------------------------------------------------
+tmp/
+temp/
+scratch/
+app_data/
+*.sqlite
+*.sqlite3
+*.db
