@@ -1,6 +1,6 @@
 {
   "name": "steam-custom-achievements",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Custom Steam Achievements Overlay & OBS Browser Source",
   "type": "module",
   "scripts": {
@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:exe": "tauri build",
-    "build:win": "tauri build"
+    "build:win": "tauri build",
+    "bump": "node scripts/bump-version.mjs patch",
+    "bump:minor": "node scripts/bump-version.mjs minor",
+    "bump:major": "node scripts/bump-version.mjs major"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.3",
