@@ -1,7 +1,35 @@
 import { ref, computed } from 'vue'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { getVersion } from '@tauri-apps/api/app'
 import { UPDATER_STATUS } from '../constants/updater.js'
+
+/**
+ * Nettoie une chaîne de version en retirant les préfixes redondants 'v' ou 'v.'
+ * @param {string|null|undefined} v
+ * @returns {string}
+ */
+export function cleanVersion(v) {
+  if (!v) return ''
+  return String(v).replace(/^v+/i, '').trim()
+}
+
+// Version de secours via define Vite ou fallback statique
+const defaultVersion = typeof __APP_VERSION__ !== 'undefined' ? cleanVersion(__APP_VERSION__) : '1.0.4'
+const currentAppVersion = ref(defaultVersion)
+
+// Détection asynchrone de la version réelle de l'exécutable nativement installé
+if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
+  getVersion()
+    .then((ver) => {
+      if (ver) {
+        currentAppVersion.value = cleanVersion(ver)
+      }
+    })
+    .catch((err) => {
+      console.warn('[AppUpdater] Impossible de récupérer la version native via getVersion():', err)
+    })
+}
 
 // État partagé en singleton au niveau du module
 const status = ref(UPDATER_STATUS.IDLE)
@@ -63,14 +91,17 @@ export function useAppUpdater() {
 
       if (update) {
         updateResource.value = update
+        const cleanNextVersion = cleanVersion(update.version)
+        const cleanCurrVersion = cleanVersion(update.currentVersion) || currentAppVersion.value
+
         updateInfo.value = {
-          version: update.version,
-          currentVersion: update.currentVersion,
+          version: cleanNextVersion,
+          currentVersion: cleanCurrVersion,
           date: update.date || '',
           body: update.body || ''
         }
         status.value = UPDATER_STATUS.AVAILABLE
-        statusMessage.value = `Version ${update.version} disponible !`
+        statusMessage.value = `Version v${cleanNextVersion} disponible !`
         showUpdateModal.value = true
         return update
       } else {
@@ -78,7 +109,7 @@ export function useAppUpdater() {
         updateInfo.value = null
         status.value = UPDATER_STATUS.UP_TO_DATE
         if (manual) {
-          statusMessage.value = 'Votre application est à jour !'
+          statusMessage.value = `Votre application est à jour (v${currentAppVersion.value}) !`
         }
         return null
       }
@@ -175,6 +206,8 @@ export function useAppUpdater() {
   return {
     status,
     updateInfo,
+    currentAppVersion,
+    cleanVersion,
     isChecking,
     isDownloading,
     isUpdateReady,
