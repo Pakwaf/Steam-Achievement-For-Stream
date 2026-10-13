@@ -107,7 +107,7 @@
 
           <div class="settings-field-row updater-field-row">
             <div class="updater-status-info">
-              <span class="current-version-text">Version : <strong>v1.0.2</strong></span>
+              <span class="current-version-text">Version : <strong>v{{ currentAppVersion }}</strong></span>
               <span v-if="updaterStatusMessage" class="updater-status-badge" :class="{ error: updaterError }">
                 {{ updaterStatusMessage }}
               </span>
@@ -148,6 +148,7 @@ const {
   isDownloading: isDownloadingUpdates,
   statusMessage: updaterStatusMessage,
   errorMessage: updaterError,
+  currentAppVersion,
   checkForUpdates
 } = useAppUpdater()
 
