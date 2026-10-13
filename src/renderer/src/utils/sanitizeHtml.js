@@ -6,20 +6,22 @@ import DOMPurify from 'dompurify'
  */
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: [
-    'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'img', 'strong', 'em', 'b', 'i', 'small', 'br', 'hr',
-    'ul', 'ol', 'li', 'section', 'article', 'header', 'footer'
+    'div', 'span', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'b', 'i', 'strong', 'em', 'small', 'br', 'hr', 'ul', 'ol', 'li',
+    'section', 'article', 'header', 'footer',
+    'svg', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'g', 'defs', 'use'
   ],
   ALLOWED_ATTR: [
-    'class', 'id', 'style', 'src', 'alt', 'width', 'height', 'title'
+    'class', 'id', 'style', 'src', 'alt', 'width', 'height', 'title',
+    'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'points', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'ry', 'xmlns'
   ],
-  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'base', 'meta', 'svg'],
+  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$)|data:|{|%7B)/i,
+  USE_PROFILES: { html: true, svg: true },
   FORBID_ATTR: [
     'onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onmouseenter',
     'onmouseleave', 'onkeydown', 'onkeyup', 'formaction', 'srcdoc'
   ],
-  ALLOW_DATA_ATTR: false,
-  FORCE_BODY: false
+  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form']
 }
 
 function getSanitizer() {
