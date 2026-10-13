@@ -1,6 +1,6 @@
 {
   "name": "steam-custom-achievements",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Custom Steam Achievements Overlay & OBS Browser Source",
   "type": "module",
   "scripts": {
@@ -16,7 +16,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.3",
+    "@tauri-apps/plugin-dialog": "^2.8.2",
     "@tauri-apps/plugin-fs": "^2.7.0",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.13.3",
     "vue": "^3.5.13",
     "vue-router": "^4.6.4"
   },

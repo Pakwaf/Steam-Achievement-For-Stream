@@ -14,3 +14,4 @@ export {
 export { useDesktopOverlay } from './useDesktopOverlay.js'
 export { useObsManager } from './useObsManager.js'
 export { useThemeLibrary } from './useThemeLibrary.js'
+export { useAppUpdater, formatBytes } from './useAppUpdater.js'

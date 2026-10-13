@@ -94,6 +94,35 @@
             </span>
           </div>
         </div>
+
+        <!-- 4. Mises à jour logicielles (Auto-Updater) -->
+        <div class="settings-block">
+          <div class="block-header-row">
+            <span class="block-icon">🚀</span>
+            <div>
+              <h4 class="block-title">Mise à Jour de l'Application</h4>
+              <p class="block-sub">Recherchez et installez les dernières versions de SteamOverlayStream</p>
+            </div>
+          </div>
+
+          <div class="settings-field-row updater-field-row">
+            <div class="updater-status-info">
+              <span class="current-version-text">Version : <strong>v1.0.2</strong></span>
+              <span v-if="updaterStatusMessage" class="updater-status-badge" :class="{ error: updaterError }">
+                {{ updaterStatusMessage }}
+              </span>
+            </div>
+            <button
+              class="btn-check-updates"
+              :disabled="isCheckingUpdates || isDownloadingUpdates"
+              @click="handleCheckUpdates"
+            >
+              <span v-if="isCheckingUpdates">⏳ Recherche...</span>
+              <span v-else-if="isDownloadingUpdates">📥 Téléchargement...</span>
+              <span v-else>🔍 Rechercher</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-if="statusMessage" class="success-banner">
@@ -112,6 +141,19 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useAppUpdater } from '../../composables/useAppUpdater.js'
+
+const {
+  isChecking: isCheckingUpdates,
+  isDownloading: isDownloadingUpdates,
+  statusMessage: updaterStatusMessage,
+  errorMessage: updaterError,
+  checkForUpdates
+} = useAppUpdater()
+
+function handleCheckUpdates() {
+  checkForUpdates(true)
+}
 
 const props = defineProps({
   isOpen: {
@@ -509,5 +551,60 @@ input:checked + .slider::before {
 
 .btn-save-modal-key:hover {
   background: linear-gradient(135deg, #7ad0ff 0%, #20a7f5 100%);
+}
+
+.updater-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.updater-status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.current-version-text {
+  font-size: 0.85rem;
+  color: var(--steam-text-main);
+}
+
+.current-version-text strong {
+  color: #66c0f4;
+}
+
+.updater-status-badge {
+  font-size: 0.75rem;
+  color: #a1cd44;
+}
+
+.updater-status-badge.error {
+  color: #ff6b6b;
+}
+
+.btn-check-updates {
+  background: rgba(102, 192, 244, 0.12);
+  border: 1px solid rgba(102, 192, 244, 0.35);
+  color: #66c0f4;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-check-updates:hover:not(:disabled) {
+  background: rgba(102, 192, 244, 0.22);
+  border-color: #66c0f4;
+  transform: translateY(-1px);
+}
+
+.btn-check-updates:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

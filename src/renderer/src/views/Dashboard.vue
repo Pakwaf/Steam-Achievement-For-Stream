@@ -141,18 +141,34 @@
         :audio-devices-list="audioDevicesList"
         :obs-status="obsStatus"
         :obs-port="modalPortValue"
-        :is-playing-test="isPlayingGlobalTest"
+        :isPlayingTest="isPlayingGlobalTest"
         :status-message="generalSettingsMessage"
         @close="closeGeneralSettingsModal"
         @test-audio="testGlobalAudioOutput"
         @save="saveGeneralSettings"
+      />
+
+      <!-- 9. Modal de mise à jour automatique -->
+      <UpdateModal
+        :is-open="showUpdateModal"
+        :update-info="updateInfo"
+        :is-checking="isCheckingUpdates"
+        :is-downloading="isDownloadingUpdates"
+        :is-update-ready="isUpdateReady"
+        :download-progress="downloadProgress"
+        :downloaded-bytes="downloadedBytes"
+        :total-bytes="totalBytes"
+        :status-message="updaterStatusMessage"
+        :error-message="updaterErrorMessage"
+        @close="closeUpdateModal"
+        @install="downloadAndInstall"
       />
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 
 // Composants synchrones de base du Dashboard
 import AchievementToast from '../components/dashboard/AchievementToast.vue'
@@ -169,6 +185,7 @@ const CustomizationEditor = defineAsyncComponent(() => import('../components/Cus
 const ApiKeyModal = defineAsyncComponent(() => import('../components/modals/ApiKeyModal.vue'))
 const PortModal = defineAsyncComponent(() => import('../components/modals/PortModal.vue'))
 const GeneralSettingsModal = defineAsyncComponent(() => import('../components/modals/GeneralSettingsModal.vue'))
+const UpdateModal = defineAsyncComponent(() => import('../components/modals/UpdateModal.vue'))
 
 // Composables métier isolés
 import { useSteamTracker } from '../composables/useSteamTracker.js'
@@ -178,6 +195,7 @@ import {
   useAudioEngine,
   getGlobalAudioSettings
 } from '../composables/useAudioEngine.js'
+import { useAppUpdater } from '../composables/useAppUpdater.js'
 
 // Constantes & Services
 import { steamAPI } from '../services/steamApi.js'
@@ -255,6 +273,28 @@ const {
   playChime,
   updateGlobalAudio
 } = useAudioEngine()
+
+// --- 5. Logique Auto-Updater Tauri v2 ---
+const {
+  updateInfo,
+  isChecking: isCheckingUpdates,
+  isDownloading: isDownloadingUpdates,
+  isUpdateReady,
+  downloadProgress,
+  downloadedBytes,
+  totalBytes,
+  statusMessage: updaterStatusMessage,
+  errorMessage: updaterErrorMessage,
+  showUpdateModal,
+  checkForUpdates,
+  downloadAndInstall,
+  closeUpdateModal
+} = useAppUpdater()
+
+onMounted(() => {
+  // Recherche automatique silencieuse au démarrage
+  checkForUpdates(false)
+})
 
 const showGeneralSettingsModal = ref(false)
 const generalSettingsMessage = ref('')

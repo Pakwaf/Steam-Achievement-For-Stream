@@ -22,7 +22,20 @@
         <span class="status-dot" :class="{ online: currentUser, offline: !currentUser }"></span>
         <span class="status-label">{{ currentUser ? currentUser.personaName : 'Déconnecté' }}</span>
       </div>
-      <!-- Bouton Paramètres Généraux (Audio global, Port OBS, Overlay) -->
+      <!-- Notification de mise à jour disponible -->
+      <button
+        v-if="updateAvailable"
+        class="btn-header-update"
+        :class="{ downloading: isDownloading }"
+        title="Une mise à jour est disponible pour SteamOverlayStream"
+        @click="openUpdateModal"
+      >
+        <span class="update-pulse-dot"></span>
+        <span v-if="!isDownloading">v{{ updateInfo?.version }} disponible</span>
+        <span v-else>Mise à jour en cours...</span>
+      </button>
+
+      <!-- Bouton Paramètres Généraux (Audio global, Port OBS, Overlay, Mises à jour) -->
       <button class="btn-header-settings" title="Paramètres généraux de l'application" @click="$emit('open-settings')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="settings-gear-icon">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
@@ -35,6 +48,8 @@
 </template>
 
 <script setup>
+import { useAppUpdater } from '../../composables/useAppUpdater.js'
+
 defineProps({
   trackerStatus: {
     type: Object,
@@ -47,6 +62,8 @@ defineProps({
 })
 
 defineEmits(['open-settings'])
+
+const { updateAvailable, updateInfo, isDownloading, openUpdateModal } = useAppUpdater()
 </script>
 
 <style scoped>
@@ -186,5 +203,56 @@ defineEmits(['open-settings'])
 .settings-gear-icon {
   width: 16px;
   height: 16px;
+}
+
+.btn-header-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(161, 205, 68, 0.15);
+  border: 1px solid rgba(161, 205, 68, 0.45);
+  color: #a1cd44;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: pulseUpdate 2s infinite ease-in-out;
+}
+
+.btn-header-update:hover {
+  background: rgba(161, 205, 68, 0.25);
+  border-color: #a1cd44;
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(161, 205, 68, 0.4);
+}
+
+.btn-header-update.downloading {
+  border-color: rgba(102, 192, 244, 0.45);
+  color: #66c0f4;
+  background: rgba(102, 192, 244, 0.15);
+}
+
+.update-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a1cd44;
+  box-shadow: 0 0 8px #a1cd44;
+}
+
+.btn-header-update.downloading .update-pulse-dot {
+  background: #66c0f4;
+  box-shadow: 0 0 8px #66c0f4;
+}
+
+@keyframes pulseUpdate {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(161, 205, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(161, 205, 68, 0.35);
+  }
 }
 </style>

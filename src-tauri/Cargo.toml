@@ -1,6 +1,6 @@
 [package]
 name = "steam-achievement-for-stream"
-version = "1.0.2"
+version = "1.0.3"
 description = "Steam Custom Achievements Overlay & OBS Source"
 authors = ["Pakwaf"]
 license = ""
@@ -33,3 +33,6 @@ open = "5.3"
 rfd = "0.15"
 base64 = "0.22"
 thiserror = "2.0"
+tauri-plugin-updater = "2.13.3"
+tauri-plugin-dialog = "2.8.2"
+tauri-plugin-process = "2.4.0"
