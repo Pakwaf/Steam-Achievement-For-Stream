@@ -2,6 +2,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { playAchievementSound } from '../utils/soundPlayer.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { VISUAL_EFFECTS, ACHIEVEMENT_TIERS, getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
+import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 import { themeStorage } from '../services/themeStorage.js'
 import { steamAPI } from '../services/steamApi.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
@@ -205,10 +206,12 @@ export function useThemeEditor(props, emit) {
       html = html.replace(/SUCCÈS DÉBLOQUÉ/g, tierMeta.defaultBadge)
     }
 
-    return enrichAchievementHtml(html, {
+    const enriched = enrichAchievementHtml(html, {
       tier: activeTier,
       visualEffect: theme.value.visualEffect || 'none'
     })
+
+    return sanitizeAchievementHtml(enriched)
   })
 
   onMounted(async () => {

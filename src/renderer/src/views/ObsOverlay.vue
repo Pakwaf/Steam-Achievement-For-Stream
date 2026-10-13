@@ -23,6 +23,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 
 const currentTheme = ref({
   html: '',
@@ -124,7 +125,7 @@ function triggerAchievement(data) {
 
   playNotificationSound()
 
-  renderedHtml.value = replacePlaceholders(currentTheme.value.html, data)
+  renderedHtml.value = sanitizeAchievementHtml(replacePlaceholders(currentTheme.value.html, data))
   isDisplaying.value = true
   isEntering.value = true
   isLeaving.value = false

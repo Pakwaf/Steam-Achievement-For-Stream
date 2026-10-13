@@ -15,7 +15,8 @@ export function useObsManager() {
     connectedClients: 0,
     obsUrl: 'http://127.0.0.1:8080/obs',
     obsUrlLocalhost: 'http://localhost:8080/obs',
-    obsUrlLan: null
+    obsUrlLan: null,
+    lanBroadcastEnabled: false
   })
   const obsUrl = ref('http://127.0.0.1:8080/obs')
 
