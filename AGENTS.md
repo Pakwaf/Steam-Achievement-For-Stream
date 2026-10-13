@@ -8,6 +8,7 @@ Ce fichier définit les directives obligatoires pour toute IA ou développeur in
 - **Langue des Installeurs Windows :**
   - MSI (WiX) : Langue impérativement définie sur `"fr-FR"` dans `tauri.conf.json` (`bundle.windows.wix.language: "fr-FR"`).
   - NSIS (`.exe`) : Langues configurées sur `["French", "English"]`.
+- **Publication Systématique sur GitHub (Règle d'or) :** À chaque build produit, obligatoirement téléverser la release sur GitHub via `gh release create v<VERSION> <assets>` avec la description détaillée en changelog des ajouts de la version.
 
 ## 2. Architecture & Clean Code
 - **Backend Rust :** Aucune logique métier dans `lib.rs` (Tauri commands minces). Tout réside dans `services/` (`ConfigService`, `ThemeService`, `ObsService`, `TrackerService`, `AudioService`, `AuthService`).

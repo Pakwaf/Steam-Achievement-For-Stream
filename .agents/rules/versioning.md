@@ -22,3 +22,13 @@ npm run bump:major    # Incrémentation majeure (1.1.0 -> 2.0.0)
 - L'installateur NSIS (`.exe`) doit supporter le français en priorité :
   `bundle.windows.nsis.languages = ["French", "English"]`
 - Ne jamais retirer ces configurations de langue dans `src-tauri/tauri.conf.json`.
+
+## 4. Publication Systématique de Release sur GitHub
+À chaque fois qu'un build est produit :
+1. Fusionner sur `main` et créer le tag `v<VERSION>`.
+2. Téléverser les fichiers installeurs (`.exe` et `.msi`) sur GitHub Releases via :
+   ```bash
+   gh release create v<VERSION> <chemins_vers_les_installateurs> --title "SteamOverlayStream v<VERSION>" --notes "<description_détaillée_des_ajouts>"
+   ```
+3. Inclure impérativement dans les `--notes` le changelog des nouveautés et corrections apportées par la version.
+
