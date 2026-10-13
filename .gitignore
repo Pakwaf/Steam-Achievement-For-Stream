@@ -15,6 +15,8 @@ recap.md
 !.env.example
 *.pem
 *.key
+*.pub
+*.key.pub
 *.cert
 *.crt
 *.pfx
@@ -22,6 +24,7 @@ recap.md
 *.keystore
 *.jks
 tauri.key
+steamoverlay_signer.*
 
 # ------------------------------------------------------------------------------
 # 3. Node & Frontend Dependencies & Caches
