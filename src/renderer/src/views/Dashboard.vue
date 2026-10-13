@@ -152,7 +152,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
+
+// Composants du Dashboard
 import CustomizationEditor from '../components/CustomizationEditor.vue'
 import AchievementToast from '../components/dashboard/AchievementToast.vue'
 import AppHeader from '../components/dashboard/AppHeader.vue'
@@ -166,359 +168,101 @@ import ApiKeyModal from '../components/modals/ApiKeyModal.vue'
 import PortModal from '../components/modals/PortModal.vue'
 import GeneralSettingsModal from '../components/modals/GeneralSettingsModal.vue'
 
+// Composables métier isolés
+import { useSteamTracker } from '../composables/useSteamTracker.js'
+import { useObsManager } from '../composables/useObsManager.js'
+import { useThemeLibrary } from '../composables/useThemeLibrary.js'
 import {
-  playAchievementSound,
-  playSynthesizedChime,
-  getAudioOutputDevices,
-  getGlobalAudioSettings,
-  setGlobalAudioSettings
-} from '../utils/soundPlayer.js'
-import { themeStorage } from '../services/themeStorage.js'
-import { ACHIEVEMENT_TIERS } from '../utils/visualEffects.js'
+  useAudioEngine,
+  getGlobalAudioSettings
+} from '../composables/useAudioEngine.js'
 
-const isInitializing = ref(true)
-const currentUser = ref(null)
-const isLoading = ref(false)
-const errorMessage = ref(null)
-const copied = ref(false)
-const obsCopied = ref(false)
-const obsLanCopied = ref(false)
-const obsLocalhostCopied = ref(false)
-const isElectron = ref(typeof window !== 'undefined' && !!window.steamAPI)
+// Constantes & Services
+import { steamAPI } from '../services/steamApi.js'
+import { STORAGE_KEYS, ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
-// Authentification et configuration Clé Steam API
-const authStep = ref('apikey') // 'apikey' | 'login'
-const steamApiKey = ref('')
-const isSavingKey = ref(false)
-const keySavedMessage = ref('')
-const showApiKeyModal = ref(false)
-const modalApiKey = ref('')
+const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
+const isElectron = ref(typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__ || window.steamAPI))
 
-// Configuration Port OBS & Préférences
-const showPortModal = ref(false)
-const modalPortValue = ref(8080)
-const portModalMessage = ref('')
-const isSavingPort = ref(false)
-const appSettings = ref({
-  obsPort: 8080,
-  soundEnabled: true,
-  soundVolume: 0.8,
-  desktopOverlayEnabled: true
-})
+// --- 1. Logique Tracker Steam & Authentification ---
+const {
+  isInitializing,
+  currentUser,
+  isLoading,
+  errorMessage,
+  authStep,
+  steamApiKey,
+  isSavingKey,
+  keySavedMessage,
+  trackerStatus,
+  activeNotification,
+  unlockedHistory,
+  isSimulating,
+  handleSaveApiKey,
+  skipApiKeySetup,
+  handleLogin,
+  handleLogout,
+  triggerDashboardTierTest,
+  dismissToast
+} = useSteamTracker()
 
-// État du tracker, de l'OBS et des succès
-const trackerStatus = ref(null)
-const obsStatus = ref({
-  isRunning: true,
-  port: 8080,
-  preferredPort: 8080,
-  hasPortConflict: false,
-  connectedClients: 0,
-  obsUrl: 'http://127.0.0.1:8080/obs',
-  obsUrlLocalhost: 'http://localhost:8080/obs',
-  obsUrlLan: null
-})
-const obsUrl = ref('http://127.0.0.1:8080/obs')
-const activeNotification = ref(null)
-const unlockedHistory = ref([])
-const isSimulating = ref(false)
-let toastTimer = null
-let obsPollInterval = null
+// --- 2. Logique Serveur OBS & Ports ---
+const {
+  obsStatus,
+  obsUrl,
+  obsCopied,
+  obsLanCopied,
+  obsLocalhostCopied,
+  showPortModal,
+  modalPortValue,
+  portModalMessage,
+  isSavingPort,
+  copyObsUrl,
+  copyObsUrlLocalhost,
+  copyObsUrlLan,
+  openObsInBrowser,
+  openObsLanInBrowser,
+  openPortModal,
+  closePortModal,
+  saveCustomPort
+} = useObsManager()
 
-// Paramètres généraux et Audio global
+// --- 3. Logique Bibliothèque de Thèmes & Galerie Studio ---
+const {
+  currentView,
+  editingTheme,
+  themeLibrary,
+  libraryStatusMessage,
+  handleActivateTheme,
+  handleEditTheme,
+  handleDuplicateTheme,
+  handleDeleteTheme,
+  handleRestoreDefaultThemes,
+  handleThemeFileImport,
+  handleExportTheme,
+  handleExportLibrary,
+  handleCreateNewTheme,
+  closeEditor,
+  onEditorThemeSaved
+} = useThemeLibrary()
+
+// --- 4. Logique Moteur Audio Global & Périphériques ---
+const {
+  audioDevices: audioDevicesList,
+  refreshAudioDevices,
+  playChime,
+  updateGlobalAudio
+} = useAudioEngine()
+
 const showGeneralSettingsModal = ref(false)
 const generalSettingsMessage = ref('')
 const isPlayingGlobalTest = ref(false)
-const audioDevicesList = ref([{ deviceId: 'default', label: 'Périphérique Windows par défaut' }])
 const globalAudioSettings = ref(getGlobalAudioSettings())
 
-// État de la Galerie de Thèmes (Studio)
-const currentView = ref('library') // 'library' | 'editor'
-const editingTheme = ref(null)
-const themeLibrary = ref({ activeThemeId: '', deletedThemeIds: [], themes: [] })
-const libraryStatusMessage = ref('')
-
-const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
-
-// Initialisation au montage
-onMounted(async () => {
-  isElectron.value = typeof window !== 'undefined' && !!window.steamAPI
-  if (window.steamAPI) {
-    try {
-      // 0. Récupération parallèle instantanée de la clé Steam API et de l'utilisateur sauvegardé
-      const [keyRes, userRes] = await Promise.all([
-        window.steamAPI.getSteamApiKey ? window.steamAPI.getSteamApiKey().catch(() => ({ apiKey: '' })) : Promise.resolve({ apiKey: '' }),
-        window.steamAPI.getCurrentUser ? window.steamAPI.getCurrentUser().catch(() => null) : Promise.resolve(null)
-      ])
-
-      // Restauration de la clé API
-      let rawKey = typeof keyRes === 'string' ? keyRes : (keyRes?.apiKey || '')
-      if (!rawKey && typeof localStorage !== 'undefined') {
-        rawKey = localStorage.getItem('steam_api_key') || ''
-      }
-      const trimmedKey = (rawKey || '').trim()
-      if (trimmedKey && trimmedKey.length >= 8) {
-        steamApiKey.value = trimmedKey
-        authStep.value = 'login'
-      } else {
-        steamApiKey.value = ''
-        authStep.value = 'apikey'
-      }
-
-      // Restauration de l'utilisateur connecté
-      let user = userRes
-      if (!user && typeof localStorage !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('steam_user')
-          if (stored) user = JSON.parse(stored)
-        } catch {
-          // ignore
-        }
-      }
-      if (user) {
-        currentUser.value = user
-      }
-
-      // Statut du tracker de log
-      const status = await window.steamAPI.getTrackerStatus()
-      trackerStatus.value = status
-
-      // Statut initial du serveur OBS
-      if (window.steamAPI.getObsStatus) {
-        const obs = await window.steamAPI.getObsStatus()
-        if (obs) {
-          obsStatus.value = obs
-          if (obs.obsUrl) obsUrl.value = obs.obsUrl
-        }
-      }
-
-      // Chargement des paramètres d'application
-      if (window.steamAPI.getAppSettings) {
-        try {
-          const s = await window.steamAPI.getAppSettings()
-          if (s) {
-            appSettings.value = { ...appSettings.value, ...s }
-            modalPortValue.value = s.obsPort || 8080
-          }
-        } catch (e) {
-          console.warn('[Dashboard] Erreur chargement settings:', e)
-        }
-      }
-
-      // Chargement de la bibliothèque de thèmes modulaires
-      await fetchThemeLibrary()
-    } catch (err) {
-      console.error('Erreur initialisation dashboard:', err)
-    } finally {
-      isInitializing.value = false
-    }
-
-    // Écoute des mises à jour d'authentification
-    if (window.steamAPI.onAuthStatusChanged) {
-      window.steamAPI.onAuthStatusChanged((user) => {
-        currentUser.value = user
-      })
-    }
-
-    // Écoute des modifications de la bibliothèque de thèmes en temps réel
-    if (window.steamAPI.onThemeLibraryUpdated) {
-      window.steamAPI.onThemeLibraryUpdated((lib) => {
-        if (lib) {
-          themeLibrary.value = lib
-        }
-      })
-    }
-
-    // Écoute des succès débloqués en temps réel
-    window.steamAPI.onAchievementUnlocked(async (achievement) => {
-      if (achievement?.isTest) return
-
-      triggerAchievementToast(achievement)
-      try {
-        let theme = null
-        if (achievement.previewTheme) {
-          theme = achievement.previewTheme
-        } else if (window.steamAPI?.getActiveTheme) {
-          theme = await window.steamAPI.getActiveTheme()
-        } else if (window.steamAPI?.getCustomization) {
-          theme = await window.steamAPI.getCustomization()
-        }
-        await playAchievementSound(theme || {})
-      } catch (err) {
-        console.warn('[Dashboard] Erreur lecture audio succès:', err)
-      }
-    })
-
-    // Écoute en temps réel des connexions/déconnexions de sources OBS
-    if (window.steamAPI.onObsStatusChanged) {
-      window.steamAPI.onObsStatusChanged((obs) => {
-        if (obs) {
-          obsStatus.value = obs
-          if (obs.obsUrl) obsUrl.value = obs.obsUrl
-        }
-      })
-    }
-
-    // Polling de secours toutes les 2.5 secondes
-    obsPollInterval = setInterval(async () => {
-      if (window.steamAPI?.getObsStatus) {
-        try {
-          const obs = await window.steamAPI.getObsStatus()
-          if (obs) obsStatus.value = obs
-        } catch {
-          // ignore
-        }
-      }
-
-      if (window.steamAPI?.getTrackerStatus) {
-        try {
-          const st = await window.steamAPI.getTrackerStatus()
-          if (st) trackerStatus.value = st
-        } catch {
-          // ignore
-        }
-      }
-    }, 2500)
-  }
-})
-
-// Récupération de la bibliothèque complète
-async function fetchThemeLibrary() {
-  if (window.steamAPI?.getThemeLibrary) {
-    try {
-      const lib = await window.steamAPI.getThemeLibrary()
-      if (lib) {
-        themeLibrary.value = lib
-      }
-    } catch (err) {
-      console.error('Erreur chargement bibliothèque de thèmes:', err)
-    }
-  }
-}
-
-// Active un thème pour les overlays
-async function handleActivateTheme(themeId) {
-  if (!window.steamAPI?.setActiveTheme) return
-  try {
-    const res = await window.steamAPI.setActiveTheme(themeId)
-    if (res.success) {
-      themeLibrary.value = res.library
-      showLibraryStatus(`Thème "${res.activeTheme?.name}" activé pour vos overlays ! ⚡`)
-    }
-  } catch (err) {
-    console.error('Erreur activation thème:', err)
-  }
-}
-
-// Ouvre l'éditeur pour ce thème précis
-function handleEditTheme(theme) {
-  editingTheme.value = JSON.parse(JSON.stringify(theme))
-  currentView.value = 'editor'
-}
-
-// Crée une copie exacte d'un thème
-async function handleDuplicateTheme(themeId) {
-  if (!window.steamAPI?.duplicateTheme) return
-  try {
-    const res = await window.steamAPI.duplicateTheme(themeId)
-    if (res.success) {
-      themeLibrary.value = res.library
-      showLibraryStatus(`Copie créée : "${res.duplicatedTheme?.name}" ✔`)
-    }
-  } catch (err) {
-    console.error('Erreur duplication thème:', err)
-  }
-}
-
-// Supprime un thème avec confirmation
-async function handleDeleteTheme(theme) {
-  if (themeLibrary.value.themes.length <= 1) {
-    alert('Impossible de supprimer le seul thème restant dans la bibliothèque.')
-    return
-  }
-
-  const confirmMsg = `Êtes-vous sûr de vouloir supprimer définitivement le thème "${theme.name}" ?`
-  if (!confirm(confirmMsg)) return
-
-  if (!window.steamAPI?.deleteTheme) return
-  try {
-    const res = await window.steamAPI.deleteTheme(theme.id)
-    if (res.success) {
-      themeLibrary.value = res.library
-      showLibraryStatus(`Thème "${theme.name}" supprimé ✔`)
-    } else if (res.error) {
-      alert(res.error)
-    }
-  } catch (err) {
-    console.error('Erreur suppression thème:', err)
-  }
-}
-
-// Restaure tous les thèmes officiels par défaut
-async function handleRestoreDefaultThemes() {
-  if (!confirm('Voulez-vous restaurer tous les thèmes officiels par défaut (Steam Gold, Cozy Pixel, Horror, Dark Fantasy, Frutiger Aero) ? Vos thèmes créés seront conservés.')) return
-
-  try {
-    if (window.steamAPI?.restoreDefaultThemes) {
-      const res = await window.steamAPI.restoreDefaultThemes()
-      if (res.success) {
-        themeLibrary.value = res.library
-        showLibraryStatus('Thèmes officiels par défaut restaurés avec succès ✔')
-      }
-    }
-  } catch (err) {
-    console.error('Erreur restauration thèmes:', err)
-  }
-}
-
-// Import / Export de thèmes
-async function handleThemeFileImport(file) {
-  if (!file) return
-  try {
-    const text = await file.text()
-    const res = await themeStorage.importTheme(text)
-    if (res.success) {
-      themeLibrary.value = res.library
-      showLibraryStatus(`Thème "${res.importedTheme?.name}" importé avec succès ! 🎉`)
-    } else {
-      alert(res.error || 'Erreur lors de l\'importation du fichier')
-    }
-  } catch (err) {
-    alert(`Erreur de lecture du fichier : ${err.message}`)
-  }
-}
-
-async function handleExportTheme(themeId) {
-  try {
-    const res = await themeStorage.exportTheme(themeId)
-    if (res.success) {
-      showLibraryStatus(`Thème exporté dans ${res.fileName} 💾`)
-    } else {
-      showLibraryStatus(res.error || 'Erreur lors de l\'export')
-    }
-  } catch (err) {
-    showLibraryStatus('Erreur export: ' + err.message)
-  }
-}
-
-async function handleExportLibrary() {
-  try {
-    const res = await themeStorage.exportLibrary()
-    if (res.success) {
-      showLibraryStatus(`${res.count} thèmes sauvegardés dans ${res.fileName} 💾`)
-    } else {
-      showLibraryStatus(res.error || 'Erreur lors de la sauvegarde de la bibliothèque')
-    }
-  } catch (err) {
-    showLibraryStatus('Erreur export: ' + err.message)
-  }
-}
-
-// Paramètres Généraux & Audio
 async function openGeneralSettingsModal() {
   showGeneralSettingsModal.value = true
   generalSettingsMessage.value = ''
-  await refreshGlobalAudioDevices()
+  await refreshAudioDevices(true)
 }
 
 function closeGeneralSettingsModal() {
@@ -526,28 +270,11 @@ function closeGeneralSettingsModal() {
   generalSettingsMessage.value = ''
 }
 
-async function refreshGlobalAudioDevices() {
-  try {
-    const devs = await getAudioOutputDevices(true)
-    if (devs && devs.length > 0) {
-      audioDevicesList.value = devs
-    }
-  } catch (err) {
-    console.warn('[Dashboard] refreshGlobalAudioDevices error:', err)
-  }
-}
-
 async function testGlobalAudioOutput() {
   if (isPlayingGlobalTest.value) return
   isPlayingGlobalTest.value = true
   try {
-    await playSynthesizedChime(
-      globalAudioSettings.value.soundVolume,
-      globalAudioSettings.value.deviceId,
-      'common'
-    )
-  } catch (err) {
-    console.error('[Dashboard] Erreur test audio global:', err)
+    await playChime(ACHIEVEMENT_TIERS_KEYS.COMMON)
   } finally {
     setTimeout(() => {
       isPlayingGlobalTest.value = false
@@ -557,23 +284,17 @@ async function testGlobalAudioOutput() {
 
 async function saveGeneralSettings({ audioSettings, obsPort }) {
   try {
-    // 1. Mise à jour de la configuration globale locale
-    setGlobalAudioSettings(audioSettings)
+    updateGlobalAudio(audioSettings)
     globalAudioSettings.value = { ...audioSettings }
     modalPortValue.value = obsPort
 
-    // 2. Persistance dans le backend AppSettings
-    const newSettings = {
+    await steamAPI.saveAppSettings({
       obsPort: obsPort || 8080,
       soundEnabled: audioSettings.soundEnabled,
       soundVolume: audioSettings.soundVolume,
       audioDeviceId: audioSettings.deviceId,
-      desktopOverlayEnabled: appSettings.value.desktopOverlayEnabled ?? true
-    }
-
-    if (window.steamAPI?.saveAppSettings) {
-      await window.steamAPI.saveAppSettings(newSettings)
-    }
+      desktopOverlayEnabled: true
+    })
 
     generalSettingsMessage.value = 'Paramètres généraux enregistrés ✔'
     setTimeout(() => {
@@ -584,178 +305,11 @@ async function saveGeneralSettings({ audioSettings, obsPort }) {
   }
 }
 
-// Simulation & Tests par Tier
-async function triggerDashboardTierTest(tier = 'common') {
-  if (isSimulating.value) return
-  isSimulating.value = true
+// --- 5. Actions Profil & Clé API Modal ---
+const copied = ref(false)
+const showApiKeyModal = ref(false)
+const modalApiKey = ref('')
 
-  const meta = ACHIEVEMENT_TIERS[tier] || ACHIEVEMENT_TIERS.common
-
-  // 1. Jouer immédiatement le son avec la tonalité / carillon du Tier dans l'app
-  let activeThm = null
-  if (window.steamAPI?.getActiveTheme) {
-    activeThm = await window.steamAPI.getActiveTheme().catch(() => null)
-  }
-  playAchievementSound(activeThm || {}, tier)
-
-  // 2. Diffuser l'alerte de test complète vers DesktopOverlay et OBS
-  try {
-    if (window.steamAPI?.broadcastTestAchievement) {
-      await window.steamAPI.broadcastTestAchievement({
-        appId: tier === 'rare' ? '550' : (tier === 'master' ? '1794680' : '440'),
-        achievementCode: tier === 'rare' ? 'ACH_FINISH_CAMPAIGN_MELEE_ONLY' : (tier === 'master' ? '100_PERCENT_MASTER' : 'TF_PLAY_GAME_EVERYCLASS'),
-        displayName: meta.defaultTitle,
-        description: meta.defaultDesc,
-        gameName: meta.defaultGame,
-        icon: meta.icon,
-        tier: tier,
-        rarityPercent: meta.defaultPercent,
-        unlockedAt: new Date().toISOString(),
-        isTest: true
-      })
-      showLibraryStatus(`Simulation de test "${meta.name}" diffusée ! 🚀`)
-    }
-  } catch (err) {
-    console.error('[Dashboard] Erreur simulation tier:', err)
-  } finally {
-    setTimeout(() => {
-      isSimulating.value = false
-    }, 1200)
-  }
-}
-
-// Crée un nouveau thème et ouvre l'éditeur
-async function handleCreateNewTheme() {
-  if (!window.steamAPI?.createTheme) return
-  try {
-    const defaultName = `Nouveau Thème (${themeLibrary.value.themes.length + 1})`
-    const res = await window.steamAPI.createTheme({ name: defaultName })
-    if (res.success) {
-      themeLibrary.value = res.library
-      editingTheme.value = res.theme
-      currentView.value = 'editor'
-      showLibraryStatus(`Nouveau thème créé : "${res.theme.name}" !`)
-    }
-  } catch (err) {
-    console.error('Erreur création thème:', err)
-  }
-}
-
-// Navigation éditeur
-function closeEditor() {
-  currentView.value = 'library'
-  editingTheme.value = null
-  fetchThemeLibrary()
-}
-
-function onEditorThemeSaved(savedTheme) {
-  if (savedTheme) {
-    const idx = themeLibrary.value.themes.findIndex((t) => t.id === savedTheme.id)
-    if (idx !== -1) {
-      themeLibrary.value.themes[idx] = savedTheme
-    }
-  }
-  fetchThemeLibrary()
-}
-
-function showLibraryStatus(msg) {
-  libraryStatusMessage.value = msg
-  setTimeout(() => {
-    if (libraryStatusMessage.value === msg) libraryStatusMessage.value = ''
-  }, 4000)
-}
-
-onUnmounted(() => {
-  if (obsPollInterval) clearInterval(obsPollInterval)
-  if (toastTimer) clearTimeout(toastTimer)
-})
-
-function triggerAchievementToast(achievement) {
-  activeNotification.value = achievement
-  unlockedHistory.value.unshift(achievement)
-
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    activeNotification.value = null
-  }, 5000)
-}
-
-function dismissToast() {
-  if (toastTimer) clearTimeout(toastTimer)
-  activeNotification.value = null
-}
-
-// Auth methods
-async function handleSaveApiKey() {
-  if (isSavingKey.value) return
-  isSavingKey.value = true
-  try {
-    const keyToSave = typeof steamApiKey.value === 'string' ? steamApiKey.value.trim() : ''
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('steam_api_key', keyToSave)
-    }
-    if (window.steamAPI?.saveSteamApiKey) {
-      await window.steamAPI.saveSteamApiKey(keyToSave)
-    }
-    keySavedMessage.value = 'Clé API enregistrée avec succès ! Redirection...'
-    setTimeout(() => {
-      keySavedMessage.value = ''
-      authStep.value = 'login'
-    }, 750)
-  } catch (err) {
-    console.error('[Dashboard] Erreur enregistrement clé Steam API:', err)
-  } finally {
-    isSavingKey.value = false
-  }
-}
-
-function skipApiKeySetup() {
-  authStep.value = 'login'
-}
-
-async function handleLogin() {
-  if (isLoading.value) return
-  isLoading.value = true
-  errorMessage.value = null
-
-  try {
-    if (!window.steamAPI) {
-      throw new Error("L'API Steam n'est pas disponible dans un navigateur standard. Veuillez utiliser la fenêtre de l'application de bureau.")
-    }
-
-    const result = await window.steamAPI.login()
-    if (result.success) {
-      currentUser.value = result.user
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('steam_user', JSON.stringify(result.user))
-      }
-    } else {
-      errorMessage.value = result.error || 'Connexion échouée.'
-    }
-  } catch (err) {
-    errorMessage.value = err.message || 'Une erreur inattendue est survenue.'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-async function handleLogout() {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('steam_user')
-    }
-    if (window.steamAPI) {
-      await window.steamAPI.logout()
-    }
-    currentUser.value = null
-    errorMessage.value = null
-    authStep.value = steamApiKey.value ? 'login' : 'apikey'
-  } catch (err) {
-    console.error('Erreur déconnexion:', err)
-  }
-}
-
-// Modals actions
 function openApiKeyModal() {
   modalApiKey.value = steamApiKey.value || ''
   showApiKeyModal.value = true
@@ -768,17 +322,15 @@ function closeApiKeyModal() {
 async function saveApiKeyFromModal(newKey) {
   steamApiKey.value = newKey
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('steam_api_key', newKey)
+    localStorage.setItem(STORAGE_KEYS.STEAM_API_KEY, newKey)
   }
-  if (window.steamAPI?.saveSteamApiKey) {
-    await window.steamAPI.saveSteamApiKey(newKey)
-  }
+  await steamAPI.saveSteamApiKey(newKey)
   showApiKeyModal.value = false
 }
 
 function openSteamProfile() {
-  if (currentUser.value?.profileUrl && window.steamAPI) {
-    window.steamAPI.openExternal(currentUser.value.profileUrl)
+  if (currentUser.value?.profileUrl) {
+    steamAPI.openExternal(currentUser.value.profileUrl)
   }
 }
 
@@ -789,93 +341,6 @@ function copySteamId() {
     setTimeout(() => {
       copied.value = false
     }, 2000)
-  }
-}
-
-function copyObsUrl() {
-  navigator.clipboard.writeText(obsUrl.value)
-  obsCopied.value = true
-  setTimeout(() => {
-    obsCopied.value = false
-  }, 2000)
-}
-
-function copyObsUrlLocalhost() {
-  const localUrl = obsStatus.value?.obsUrlLocalhost || `http://localhost:${obsStatus.value?.port || 8080}/obs`
-  navigator.clipboard.writeText(localUrl)
-  obsLocalhostCopied.value = true
-  setTimeout(() => {
-    obsLocalhostCopied.value = false
-  }, 2000)
-}
-
-function copyObsUrlLan() {
-  if (obsStatus.value?.obsUrlLan) {
-    navigator.clipboard.writeText(obsStatus.value.obsUrlLan)
-    obsLanCopied.value = true
-    setTimeout(() => {
-      obsLanCopied.value = false
-    }, 2000)
-  }
-}
-
-function openObsLanInBrowser() {
-  if (obsStatus.value?.obsUrlLan) {
-    if (window.steamAPI?.openExternal) {
-      window.steamAPI.openExternal(obsStatus.value.obsUrlLan)
-    } else {
-      window.open(obsStatus.value.obsUrlLan, '_blank')
-    }
-  }
-}
-
-function openPortModal() {
-  modalPortValue.value = obsStatus.value?.preferredPort || obsStatus.value?.port || 8080
-  portModalMessage.value = ''
-  showPortModal.value = true
-}
-
-function closePortModal() {
-  showPortModal.value = false
-  portModalMessage.value = ''
-}
-
-async function saveCustomPort(p) {
-  if (!p || p < 1024 || p > 65535) {
-    alert('Veuillez entrer un numéro de port valide entre 1024 et 65535.')
-    return
-  }
-
-  isSavingPort.value = true
-  try {
-    if (window.steamAPI?.setObsPort) {
-      const updatedStatus = await window.steamAPI.setObsPort(p)
-      if (updatedStatus) {
-        obsStatus.value = updatedStatus
-        if (updatedStatus.obsUrl) obsUrl.value = updatedStatus.obsUrl
-      }
-    }
-    appSettings.value.obsPort = p
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('app_settings', JSON.stringify(appSettings.value))
-    }
-    portModalMessage.value = `Port mis à jour sur ${p} avec succès !`
-    setTimeout(() => {
-      closePortModal()
-    }, 1200)
-  } catch (err) {
-    console.error('Erreur setObsPort:', err)
-    alert('Erreur lors du changement de port: ' + err)
-  } finally {
-    isSavingPort.value = false
-  }
-}
-
-function openObsInBrowser() {
-  if (window.steamAPI?.openExternal) {
-    window.steamAPI.openExternal(obsUrl.value)
-  } else {
-    window.open(obsUrl.value, '_blank')
   }
 }
 

@@ -1,5 +1,6 @@
 import { readTextFile, writeTextFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
+import { IPC_COMMANDS, STORAGE_KEYS } from '../constants/index.js'
 import {
   BUILTIN_THEMES,
   DEFAULT_THEME,
@@ -57,7 +58,7 @@ class ThemeStorageService {
     // 1. Essai backend Rust natif (AppData direct)
     if (this.isTauriAvailable()) {
       try {
-        const raw = await invoke('get_theme_library')
+        const raw = await invoke(IPC_COMMANDS.GET_THEME_LIBRARY)
         if (raw && Array.isArray(raw.themes) && raw.themes.length > 0) {
           loaded = raw
         }
@@ -86,7 +87,7 @@ class ThemeStorageService {
     // 3. Fallback localStorage
     if (!loaded && typeof localStorage !== 'undefined') {
       try {
-        const stored = localStorage.getItem('steam_overlay_themes_v2')
+        const stored = localStorage.getItem(STORAGE_KEYS.THEMES)
         if (stored) {
           const parsed = JSON.parse(stored)
           if (parsed && Array.isArray(parsed.themes) && parsed.themes.length > 0) {
@@ -158,7 +159,7 @@ class ThemeStorageService {
     // 1. Sauvegarde instantanée dans localStorage
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem('steam_overlay_themes_v2', json)
+        localStorage.setItem(STORAGE_KEYS.THEMES, json)
       } catch (e) {
         console.warn('[ThemeStorage] Erreur sauvegarde localStorage:', e)
       }
@@ -167,7 +168,7 @@ class ThemeStorageService {
     // 2. Sauvegarde via le backend natif Rust (AppData)
     if (this.isTauriAvailable()) {
       try {
-        await invoke('save_theme_library', { library: this.cachedLibrary })
+        await invoke(IPC_COMMANDS.SAVE_THEME_LIBRARY, { library: this.cachedLibrary })
       } catch (err) {
         console.warn('[ThemeStorage] save_theme_library erreur:', err)
       }
@@ -185,7 +186,7 @@ class ThemeStorageService {
     const active = this.getActiveThemeSync()
     if (active && this.isTauriAvailable()) {
       try {
-        await invoke('update_customization', { theme: active })
+        await invoke(IPC_COMMANDS.UPDATE_CUSTOMIZATION, { theme: active })
       } catch (err) {
         console.warn('[ThemeStorage] Erreur synchronisation customization:', err)
       }

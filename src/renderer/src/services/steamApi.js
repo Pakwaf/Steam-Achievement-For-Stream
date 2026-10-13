@@ -1,11 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { themeStorage } from './themeStorage.js'
+import { IPC_EVENTS, IPC_COMMANDS } from '../constants/index.js'
 
 export const steamAPI = {
   login: async () => {
     try {
-      const user = await invoke('login')
+      const user = await invoke(IPC_COMMANDS.LOGIN)
       return { success: true, user }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -14,7 +15,7 @@ export const steamAPI = {
 
   logout: async () => {
     try {
-      await invoke('logout')
+      await invoke(IPC_COMMANDS.LOGOUT)
       return { success: true }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -23,7 +24,7 @@ export const steamAPI = {
 
   getCurrentUser: async () => {
     try {
-      return await invoke('get_current_user')
+      return await invoke(IPC_COMMANDS.GET_CURRENT_USER)
     } catch {
       return null
     }
@@ -31,7 +32,7 @@ export const steamAPI = {
 
   openExternal: async (url) => {
     try {
-      return await invoke('open_external', { url })
+      return await invoke(IPC_COMMANDS.OPEN_EXTERNAL, { url })
     } catch (err) {
       console.warn('Erreur ouverture lien externe:', err)
       if (typeof window !== 'undefined') window.open(url, '_blank')
@@ -40,7 +41,7 @@ export const steamAPI = {
 
   onAuthStatusChanged: (callback) => {
     let unlisten = null
-    listen('steam:auth-status-changed', (event) => {
+    listen(IPC_EVENTS.AUTH_STATUS_CHANGED, (event) => {
       callback(event.payload)
     }).then((fn) => {
       unlisten = fn
@@ -52,7 +53,7 @@ export const steamAPI = {
 
   onAchievementUnlocked: (callback) => {
     let unlisten = null
-    listen('steam:achievement-unlocked', (event) => {
+    listen(IPC_EVENTS.ACHIEVEMENT_UNLOCKED, (event) => {
       callback(event.payload)
     }).then((fn) => {
       unlisten = fn
@@ -64,7 +65,7 @@ export const steamAPI = {
 
   getTrackerStatus: async () => {
     try {
-      return await invoke('get_tracker_status')
+      return await invoke(IPC_COMMANDS.GET_TRACKER_STATUS)
     } catch (err) {
       return {
         isTracking: false,
@@ -80,7 +81,7 @@ export const steamAPI = {
 
   simulateAchievement: async (params = {}) => {
     try {
-      const achievement = await invoke('simulate_achievement', {
+      const achievement = await invoke(IPC_COMMANDS.SIMULATE_ACHIEVEMENT, {
         appId: params.appId || '440',
         achievementCode: params.achievementCode || 'TF_PLAY_GAME_EVERYCLASS'
       })
@@ -92,7 +93,7 @@ export const steamAPI = {
 
   getObsStatus: async () => {
     try {
-      return await invoke('get_obs_status')
+      return await invoke(IPC_COMMANDS.GET_OBS_STATUS)
     } catch {
       return {
         isRunning: false,
@@ -105,7 +106,7 @@ export const steamAPI = {
 
   onObsStatusChanged: (callback) => {
     let unlisten = null
-    listen('obs:status-changed', (event) => {
+    listen(IPC_EVENTS.OBS_STATUS_CHANGED, (event) => {
       callback(event.payload)
     }).then((fn) => {
       unlisten = fn
@@ -140,7 +141,7 @@ export const steamAPI = {
   onCustomizationUpdated: (callback) => {
     const unsubLocal = themeStorage.onCustomizationUpdated(callback)
     let unlistenEvent = null
-    listen('customization:updated', (event) => {
+    listen(IPC_EVENTS.CUSTOMIZATION_UPDATED, (event) => {
       callback(event.payload)
     }).then((fn) => {
       unlistenEvent = fn
@@ -154,7 +155,7 @@ export const steamAPI = {
 
   broadcastTestAchievement: async (achievementData) => {
     try {
-      await invoke('broadcast_test_achievement', { achievementData })
+      await invoke(IPC_COMMANDS.BROADCAST_TEST_ACHIEVEMENT, { achievementData })
       return { success: true, achievement: achievementData }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -163,7 +164,7 @@ export const steamAPI = {
 
   selectAudioFile: async () => {
     try {
-      const filePath = await invoke('select_audio_file')
+      const filePath = await invoke(IPC_COMMANDS.SELECT_AUDIO_FILE)
       if (filePath) {
         return { success: true, filePath }
       }
@@ -175,7 +176,7 @@ export const steamAPI = {
 
   getAudioData: async (filePath) => {
     try {
-      return await invoke('get_audio_data', { filePath: filePath || null })
+      return await invoke(IPC_COMMANDS.GET_AUDIO_DATA, { filePath: filePath || null })
     } catch (err) {
       console.warn('[steamAPI] getAudioData error:', err)
       return { hasAudio: false, dataUrl: null }
@@ -184,7 +185,7 @@ export const steamAPI = {
 
   getSteamApiKey: async () => {
     try {
-      return await invoke('get_steam_api_key')
+      return await invoke(IPC_COMMANDS.GET_STEAM_API_KEY)
     } catch {
       return { apiKey: '', hasKey: false }
     }
@@ -192,7 +193,7 @@ export const steamAPI = {
 
   saveSteamApiKey: async (key) => {
     try {
-      return await invoke('save_steam_api_key', { key })
+      return await invoke(IPC_COMMANDS.SAVE_STEAM_API_KEY, { key })
     } catch (err) {
       return { success: false, error: String(err) }
     }
@@ -200,7 +201,7 @@ export const steamAPI = {
 
   getAppSettings: async () => {
     try {
-      return await invoke('get_app_settings')
+      return await invoke(IPC_COMMANDS.GET_APP_SETTINGS)
     } catch (err) {
       console.warn('[steamAPI] getAppSettings error:', err)
       return {
@@ -214,7 +215,7 @@ export const steamAPI = {
 
   saveAppSettings: async (settings) => {
     try {
-      return await invoke('save_app_settings', { settings })
+      return await invoke(IPC_COMMANDS.SAVE_APP_SETTINGS, { settings })
     } catch (err) {
       return { success: false, error: String(err) }
     }
@@ -222,7 +223,7 @@ export const steamAPI = {
 
   setObsPort: async (port) => {
     try {
-      return await invoke('set_obs_port', { port: Number(port) })
+      return await invoke(IPC_COMMANDS.SET_OBS_PORT, { port: Number(port) })
     } catch (err) {
       return { success: false, error: String(err) }
     }
