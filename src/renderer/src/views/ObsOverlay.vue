@@ -1,5 +1,10 @@
 <template>
   <div class="obs-overlay-container">
+    <!-- Le CSS global du thème est injecté ici de manière native -->
+    <component is="style" type="text/css">
+      {{ currentThemeCss }}
+    </component>
+
     <!-- Indicateur d'état de connexion OBS (visible brièvement lors du setup) -->
     <div v-if="showDebugBanner" class="obs-debug-pill" :class="{ connected: isConnected }">
       <span class="dot"></span>
@@ -12,14 +17,9 @@
       class="master-overlay-container"
       :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
     >
-      <!-- Le CSS global du thème est injecté ici, sans DOMPurify -->
-      <component is="style" type="text/css">
-        {{ currentThemeCss }}
-      </component>
-
       <!-- Le rendu du HTML du thème, encapsulé pour ne pas casser la vue -->
       <div class="theme-wrapper" :class="[tierClass, fxClass]">
-        <div v-html="processedHtml" class="achievement-render-box"></div>
+        <div v-html="processedHtml" class="achievement-render-box achievement-card"></div>
       </div>
     </div>
   </div>
@@ -28,7 +28,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
-import { sanitizeSoft, sanitizeCss } from '../utils/sanitizeSoft.js'
+import { sanitizeCss } from '../utils/sanitizeCss.js'
 
 const visualEffectsCss = getVisualEffectsCss()
 
@@ -165,8 +165,8 @@ function triggerAchievement(data) {
     visualEffect: currentFx.value
   })
 
-  // 3. Sanitisation douce Safe HTML (sans DOMPurify)
-  processedHtml.value = sanitizeSoft(enriched)
+  // 3. Injection directe du HTML brut (Raw HTML) - Sécurité CSP
+  processedHtml.value = enriched
 
   isDisplaying.value = true
   isEntering.value = true
@@ -194,40 +194,34 @@ function replacePlaceholders(template, data) {
     : (tier === 'rare' ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ')
   const rarity = data.rarityPercent ? `${data.rarityPercent}%` : (tier === 'rare' ? '4.8%' : '42.5%')
 
-  const title = escapeHtml(data.displayName || data.title || data.name || 'Succès Débloqué')
-  const description = escapeHtml(data.description || data.desc || '')
+  const title = (data.displayName || data.title || data.name || 'Succès Débloqué').toString()
+  const description = (data.description || data.desc || '').toString()
   let icon = (data.icon || data.iconUrl || data.icon_url || data.iconPath || fallbackIcon).toString().trim()
   if (!icon) icon = fallbackIcon
   if (icon.startsWith('http://') && (icon.includes('steamstatic.com') || icon.includes('akamaihd.net') || icon.includes('steampowered.com'))) {
     icon = icon.replace('http://', 'https://')
   }
 
-  const game = escapeHtml(data.gameName || data.game || data.game_name || 'Steam')
+  const game = (data.gameName || data.game || data.game_name || 'Steam').toString()
 
   let html = template
-    .replace(/\{title\}/gi, title)
-    .replace(/\{description\}/gi, description)
-    .replace(/\{icon\}/gi, icon)
-    .replace(/\{iconUrl\}/gi, icon)
-    .replace(/\{icon_url\}/gi, icon)
-    .replace(/\{image\}/gi, icon)
-    .replace(/\{img\}/gi, icon)
-    .replace(/\{game\}/gi, game)
-    .replace(/\{tier\}/gi, tier)
-    .replace(/\{tierLabel\}/gi, defaultBadge)
-    .replace(/\{rarity\}/gi, rarity)
+    .replace(/\{title\}/g, title)
+    .replace(/\{description\}/g, description)
+    .replace(/\{icon\}/g, icon)
+    .replace(/\{iconUrl\}/g, icon)
+    .replace(/\{icon_url\}/g, icon)
+    .replace(/\{image\}/g, icon)
+    .replace(/\{img\}/g, icon)
+    .replace(/\{game\}/g, game)
+    .replace(/\{tier\}/g, tier)
+    .replace(/\{tierLabel\}/g, defaultBadge)
+    .replace(/\{rarity\}/g, rarity)
 
   if (tier !== 'common') {
     html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge)
   }
 
   return html
-}
-
-function escapeHtml(text) {
-  if (!text) return ''
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
-  return text.toString().replace(/[&<>"']/g, (m) => map[m])
 }
 
 async function playNotificationSound() {

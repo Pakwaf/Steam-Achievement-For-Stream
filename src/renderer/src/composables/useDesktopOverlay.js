@@ -3,16 +3,10 @@ import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
 import { enrichAchievementHtml, getVisualEffectsCss } from '../utils/visualEffects.js'
-import { sanitizeSoft, sanitizeCss } from '../utils/sanitizeSoft.js'
+import { sanitizeCss } from '../utils/sanitizeCss.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 const FALLBACK_ICON = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
-
-function escapeHtml(text) {
-  if (!text) return ''
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
-  return text.toString().replace(/[&<>"']/g, (m) => map[m])
-}
 
 function replacePlaceholders(template, data) {
   if (!template) return ''
@@ -22,28 +16,28 @@ function replacePlaceholders(template, data) {
     : (tier === ACHIEVEMENT_TIERS_KEYS.RARE ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ')
   const rarityText = data.rarityPercent ? (data.rarityPercent + '%') : (tier === ACHIEVEMENT_TIERS_KEYS.RARE ? '4.8%' : '42.5%')
 
-  const title = escapeHtml(data.displayName || data.title || data.name || 'Succès Débloqué')
-  const description = escapeHtml(data.description || data.desc || '')
+  const title = (data.displayName || data.title || data.name || 'Succès Débloqué').toString()
+  const description = (data.description || data.desc || '').toString()
   let icon = (data.icon || data.iconUrl || data.icon_url || data.iconPath || FALLBACK_ICON).toString().trim()
   if (!icon) icon = FALLBACK_ICON
   if (icon.startsWith('http://') && (icon.includes('steamstatic.com') || icon.includes('akamaihd.net') || icon.includes('steampowered.com'))) {
     icon = icon.replace('http://', 'https://')
   }
 
-  const game = escapeHtml(data.gameName || data.game || data.game_name || 'Steam')
+  const game = (data.gameName || data.game || data.game_name || 'Steam').toString()
 
   let html = template
-    .replace(/\{title\}/gi, title)
-    .replace(/\{description\}/gi, description)
-    .replace(/\{icon\}/gi, icon)
-    .replace(/\{iconUrl\}/gi, icon)
-    .replace(/\{icon_url\}/gi, icon)
-    .replace(/\{image\}/gi, icon)
-    .replace(/\{img\}/gi, icon)
-    .replace(/\{game\}/gi, game)
-    .replace(/\{tier\}/gi, tier)
-    .replace(/\{tierLabel\}/gi, defaultBadge)
-    .replace(/\{rarity\}/gi, rarityText)
+    .replace(/\{title\}/g, title)
+    .replace(/\{description\}/g, description)
+    .replace(/\{icon\}/g, icon)
+    .replace(/\{iconUrl\}/g, icon)
+    .replace(/\{icon_url\}/g, icon)
+    .replace(/\{image\}/g, icon)
+    .replace(/\{img\}/g, icon)
+    .replace(/\{game\}/g, game)
+    .replace(/\{tier\}/g, tier)
+    .replace(/\{tierLabel\}/g, defaultBadge)
+    .replace(/\{rarity\}/g, rarityText)
 
   if (tier !== ACHIEVEMENT_TIERS_KEYS.COMMON) {
     html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge)
@@ -54,7 +48,7 @@ function replacePlaceholders(template, data) {
 
 /**
  * Composable pour l'Overlay transparent de bureau (Desktop Overlay).
- * Rendu natif Vue 3 avec sanitisation douce (Safe HTML) et injection CSS isolée.
+ * Rendu natif Vue 3 avec Raw HTML direct et sécurité assurée par la CSP Tauri.
  */
 export function useDesktopOverlay() {
   const visualEffectsCss = getVisualEffectsCss()
@@ -124,8 +118,8 @@ export function useDesktopOverlay() {
       visualEffect: currentFx.value
     })
 
-    // 5. Sanitisation douce (Safe HTML) : neutralise XSS sans détruire le CSS/HTML
-    processedHtml.value = sanitizeSoft(enriched)
+    // 5. Injection directe du HTML brut (Raw HTML) - Sécurité assurée par la CSP Tauri
+    processedHtml.value = enriched
 
     // 6. CSS du tier
     const tierCss = effectiveTheme.tiers?.[tier]?.css || ''

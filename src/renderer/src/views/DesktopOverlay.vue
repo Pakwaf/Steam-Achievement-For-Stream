@@ -1,17 +1,19 @@
 <template>
-  <div
-    v-show="isDisplaying"
-    class="master-overlay-container"
-    :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
-  >
-    <!-- Le CSS global du thème est injecté ici, sans DOMPurify -->
+  <div class="overlay-root">
+    <!-- Le CSS global du thème est injecté ici de manière native -->
     <component is="style" type="text/css">
       {{ currentThemeCss }}
     </component>
 
-    <!-- Le rendu du HTML du thème, encapsulé pour ne pas casser la vue -->
-    <div class="theme-wrapper" :class="[tierClass, fxClass]">
-      <div v-html="processedHtml" class="achievement-render-box"></div>
+    <div
+      v-show="isDisplaying"
+      class="master-overlay-container"
+      :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
+    >
+      <!-- Le rendu du HTML du thème, encapsulé pour ne pas casser la vue -->
+      <div class="theme-wrapper" :class="[tierClass, fxClass]">
+        <div v-html="processedHtml" class="achievement-render-box achievement-card"></div>
+      </div>
     </div>
   </div>
 </template>

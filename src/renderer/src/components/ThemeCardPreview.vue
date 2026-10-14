@@ -11,7 +11,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { sanitizeSoft, sanitizeCss } from '../utils/sanitizeSoft.js'
+import { sanitizeCss } from '../utils/sanitizeCss.js'
 
 const props = defineProps({
   html: {
@@ -33,27 +33,21 @@ const dummyData = {
   icon: fallbackIcon
 }
 
-function escapeHtml(text) {
-  if (!text) return ''
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
-  return text.toString().replace(/[&<>"']/g, (m) => map[m])
-}
-
 const renderedHtml = computed(() => {
   if (!props.html) return '<div style="color: #6a7c93; font-size: 13px;">Aucun HTML défini</div>'
   return props.html
-    .replace(/\{title\}/gi, escapeHtml(dummyData.title))
-    .replace(/\{description\}/gi, escapeHtml(dummyData.description))
-    .replace(/\{icon\}/gi, dummyData.icon)
-    .replace(/\{iconUrl\}/gi, dummyData.icon)
-    .replace(/\{icon_url\}/gi, dummyData.icon)
-    .replace(/\{image\}/gi, dummyData.icon)
-    .replace(/\{img\}/gi, dummyData.icon)
-    .replace(/\{game\}/gi, escapeHtml(dummyData.game))
+    .replace(/\{title\}/g, dummyData.title)
+    .replace(/\{description\}/g, dummyData.description)
+    .replace(/\{icon\}/g, dummyData.icon)
+    .replace(/\{iconUrl\}/g, dummyData.icon)
+    .replace(/\{icon_url\}/g, dummyData.icon)
+    .replace(/\{image\}/g, dummyData.icon)
+    .replace(/\{img\}/g, dummyData.icon)
+    .replace(/\{game\}/g, dummyData.game)
 })
 
 const processedHtml = computed(() => {
-  return sanitizeSoft(renderedHtml.value)
+  return renderedHtml.value
 })
 
 const safeCss = computed(() => {

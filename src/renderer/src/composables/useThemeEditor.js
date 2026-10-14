@@ -4,7 +4,6 @@ import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { VISUAL_EFFECTS, ACHIEVEMENT_TIERS, getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
 import { themeStorage } from '../services/themeStorage.js'
 import { steamAPI } from '../services/steamApi.js'
-import { sanitizeSoft } from '../utils/sanitizeSoft.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 export function useThemeEditor(props, emit) {
@@ -220,7 +219,8 @@ export function useThemeEditor(props, emit) {
       visualEffect: theme.value.visualEffect || 'none'
     })
 
-    return sanitizeSoft(enriched)
+    // Rendu Raw HTML direct - Sécurité garantie par la CSP de Tauri
+    return enriched
   })
 
   onMounted(async () => {

@@ -44,7 +44,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { sanitizeSoft, sanitizeCss } from '../../utils/sanitizeSoft.js'
+import { sanitizeCss } from '../../utils/sanitizeCss.js'
 
 const props = defineProps({
   selectedPreviewTier: {
@@ -72,7 +72,7 @@ const props = defineProps({
 defineEmits(['update:selectedPreviewTier'])
 
 const processedHtml = computed(() => {
-  return sanitizeSoft(props.previewHtml)
+  return props.previewHtml
 })
 
 const safeCss = computed(() => {
