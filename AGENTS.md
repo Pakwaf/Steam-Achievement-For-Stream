@@ -17,7 +17,7 @@ Ce fichier définit les directives obligatoires pour toute IA ou développeur in
 
 ## 2. Architecture & Clean Code
 - **Backend Rust :** Aucune logique métier dans `lib.rs` (Tauri commands minces). Tout réside dans `services/` (`ConfigService`, `ThemeService`, `ObsService`, `TrackerService`, `AudioService`, `AuthService`).
-  - Rendu natif des thèmes & Raw HTML : Utiliser le moteur de rendu natif Vue 3 avec `<component is="style">` (sécurisé via `sanitizeCss`) et `<div v-html="processedHtml">` brut (sans `DOMPurify` ni altération du HTML/CSS des thèmes). La sécurité est garantie exclusivement par la Content Security Policy (CSP) stricte de Tauri (`script-src 'self'`), bloquant nativement toute exécution de script non autorisé, avec whitelist explicite des CDN d'images Steam.
+  - Rendu natif des thèmes & Raw HTML : Utiliser le moteur de rendu natif Vue 3 avec `<component :is="'style'">` et `<div v-html="renderedHtml">` brut (sans `DOMPurify`, ni assainisseur regex, ni iframe sandbox). L'application s'appuie sur la configuration de sécurité standard de Tauri (`csp: null`).
   - Zéro magic string : utiliser les constantes de `src/renderer/src/constants/` (`IPC_EVENTS`, `IPC_COMMANDS`, `STORAGE_KEYS`, `ACHIEVEMENT_TIERS_KEYS`).
   - Composants fins (SFC amincis) : déléguer la logique métier aux composables (`useSteamTracker`, `useThemeEditor`, `useAudioEngine`, `useObsManager`, `useThemeLibrary`, `useDesktopOverlay`).
   - Performance : toujours conserver `will-change: transform, opacity;` et l'accélération GPU sur les overlays et effets visuels pour garantir 60 FPS constants.

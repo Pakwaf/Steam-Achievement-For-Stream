@@ -1,9 +1,8 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
-import { enrichAchievementHtml, getVisualEffectsCss } from '../utils/visualEffects.js'
-import { sanitizeCss } from '../utils/sanitizeCss.js'
+import { enrichAchievementHtml } from '../utils/visualEffects.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 const FALLBACK_ICON = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
@@ -27,17 +26,17 @@ function replacePlaceholders(template, data) {
   const game = (data.gameName || data.game || data.game_name || 'Steam').toString()
 
   let html = template
-    .replace(/\{title\}/g, title)
-    .replace(/\{description\}/g, description)
-    .replace(/\{icon\}/g, icon)
-    .replace(/\{iconUrl\}/g, icon)
-    .replace(/\{icon_url\}/g, icon)
-    .replace(/\{image\}/g, icon)
-    .replace(/\{img\}/g, icon)
-    .replace(/\{game\}/g, game)
-    .replace(/\{tier\}/g, tier)
-    .replace(/\{tierLabel\}/g, defaultBadge)
-    .replace(/\{rarity\}/g, rarityText)
+    .replace(/\{title\}/gi, title)
+    .replace(/\{description\}/gi, description)
+    .replace(/\{icon\}/gi, icon)
+    .replace(/\{iconUrl\}/gi, icon)
+    .replace(/\{icon_url\}/gi, icon)
+    .replace(/\{image\}/gi, icon)
+    .replace(/\{img\}/gi, icon)
+    .replace(/\{game\}/gi, game)
+    .replace(/\{tier\}/gi, tier)
+    .replace(/\{tierLabel\}/gi, defaultBadge)
+    .replace(/\{rarity\}/gi, rarityText)
 
   if (tier !== ACHIEVEMENT_TIERS_KEYS.COMMON) {
     html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge)
@@ -48,40 +47,14 @@ function replacePlaceholders(template, data) {
 
 /**
  * Composable pour l'Overlay transparent de bureau (Desktop Overlay).
- * Rendu natif Vue 3 avec Raw HTML direct et sécurité assurée par la CSP Tauri.
+ * Isole la souscription IPC, le moteur de rendu HTML/CSS dynamique et l'animation des succès.
  */
 export function useDesktopOverlay() {
-  const visualEffectsCss = getVisualEffectsCss()
   const currentTheme = ref({ ...DEFAULT_THEME })
   const activePreviewTheme = ref(null)
   const currentTierOverrideCss = ref('')
-  const processedHtml = ref('')
-
-  const currentTier = ref(ACHIEVEMENT_TIERS_KEYS.COMMON)
-  const currentFx = ref('none')
-  const isDisplaying = ref(false)
-  const isEntering = ref(false)
-  const isLeaving = ref(false)
-
-  const tierClass = computed(() => {
-    return currentTier.value === ACHIEVEMENT_TIERS_KEYS.MASTER
-      ? 'tier-master'
-      : (currentTier.value === ACHIEVEMENT_TIERS_KEYS.RARE ? 'tier-rare' : 'tier-common')
-  })
-
-  const fxClass = computed(() => {
-    return currentFx.value && currentFx.value !== 'none'
-      ? `fx-${currentFx.value.replace(/_/g, '-')}`
-      : ''
-  })
-
-  // CSS universel des tiers/effets + CSS du thème + surcharge du tier actif
-  const currentThemeCss = computed(() => {
-    const effectiveTheme = activePreviewTheme.value || currentTheme.value || DEFAULT_THEME
-    const baseCss = effectiveTheme.css || DEFAULT_THEME.css || ''
-    const tierCss = currentTierOverrideCss.value || ''
-    return sanitizeCss(`${visualEffectsCss}\n${baseCss}\n${tierCss}`)
-  })
+  const renderedHtml = ref('')
+  const slotRef = ref(null)
 
   let unsubs = []
   let dismissTimer = null
@@ -96,53 +69,51 @@ export function useDesktopOverlay() {
     activePreviewTheme.value = achievement.previewTheme || null
 
     const tier = achievement.tier || ACHIEVEMENT_TIERS_KEYS.COMMON
-    currentTier.value = tier
-    currentFx.value = effectiveTheme.visualEffect || 'none'
 
-    // 1. Son
+    // 1. Jouer le son
     playAchievementSound(effectiveTheme, tier)
 
-    // 2. Sélection du template HTML
+    // 2. Sélection du template HTML adapté au tier (ou fallback base)
     const tierHtml = effectiveTheme.tiers?.[tier]?.html
     const baseHtml = effectiveTheme.html
     const tpl = (tierHtml && tierHtml.trim())
       ? tierHtml
       : ((baseHtml && baseHtml.trim()) ? baseHtml : DEFAULT_THEME.html)
 
-    // 3. Substitution des variables
-    const rawReplaced = replacePlaceholders(tpl, achievement)
+    const processed = replacePlaceholders(tpl, achievement)
 
-    // 4. Enrichissement calque d'effets visuels
-    const enriched = enrichAchievementHtml(rawReplaced, {
+    // 3. Enrichir avec calque d'effets visuels et injecter le Raw HTML
+    renderedHtml.value = enrichAchievementHtml(processed, {
       tier,
-      visualEffect: currentFx.value
+      visualEffect: effectiveTheme.visualEffect || 'none'
     })
 
-    // 5. Injection directe du HTML brut (Raw HTML) - Sécurité assurée par la CSP Tauri
-    processedHtml.value = enriched
+    // 4. CSS de surcharge du Tier
+    const tierCss = effectiveTheme.tiers?.[tier]?.css
+    currentTierOverrideCss.value = tierCss || ''
 
-    // 6. CSS du tier
-    const tierCss = effectiveTheme.tiers?.[tier]?.css || ''
-    currentTierOverrideCss.value = tierCss
+    // 5. Animation d'entrée
+    nextTick(() => {
+      const rootNode = slotRef.value?.firstElementChild
+      if (rootNode) {
+        rootNode.classList.remove('animate-leave')
+        void rootNode.offsetWidth
+        rootNode.classList.add('animate-enter')
+      }
+    })
 
-    // 7. Affichage et animation d'entrée
-    isDisplaying.value = true
-    isEntering.value = true
-    isLeaving.value = false
-
-    // 8. Animation de sortie après 5 secondes
+    // 6. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
-      isEntering.value = false
-      isLeaving.value = true
+      const rootNode = slotRef.value?.firstElementChild
+      if (rootNode) {
+        rootNode.classList.remove('animate-enter')
+        rootNode.classList.add('animate-leave')
+      }
 
       leaveTimer = setTimeout(() => {
-        isDisplaying.value = false
-        isLeaving.value = false
-        processedHtml.value = ''
+        renderedHtml.value = ''
         activePreviewTheme.value = null
         currentTierOverrideCss.value = ''
-        currentTier.value = ACHIEVEMENT_TIERS_KEYS.COMMON
-        currentFx.value = 'none'
       }, 450)
     }, 5000)
   }
@@ -191,18 +162,9 @@ export function useDesktopOverlay() {
   return {
     currentTheme,
     activePreviewTheme,
-    currentTier,
-    currentFx,
-    tierClass,
-    fxClass,
-    isDisplaying,
-    isEntering,
-    isLeaving,
     currentTierOverrideCss,
-    currentThemeCss,
-    processedHtml,
-    sanitizedHtml: processedHtml, // alias rétro-compatibilité
-    renderedHtml: processedHtml,   // alias rétro-compatibilité
+    renderedHtml,
+    slotRef,
     triggerAchievement
   }
 }

@@ -1,34 +1,30 @@
 <template>
   <div class="obs-overlay-container">
-    <!-- Le CSS global du thème est injecté ici de manière native -->
-    <component is="style" type="text/css">
-      {{ currentThemeCss }}
-    </component>
-
     <!-- Indicateur d'état de connexion OBS (visible brièvement lors du setup) -->
     <div v-if="showDebugBanner" class="obs-debug-pill" :class="{ connected: isConnected }">
       <span class="dot"></span>
       <span>{{ isConnected ? 'OBS Connecté (ws://127.0.0.1:8080)' : 'Connexion au serveur OBS...' }}</span>
     </div>
 
-    <!-- Zone de rendu fixe pour la notification de succès en bas à droite -->
+    <!-- Style CSS universel (effets, tiers) + CSS du thème injecté -->
+    <component :is="'style'">
+      {{ visualEffectsCss }}
+      {{ currentTheme.css || '' }}
+    </component>
+
+    <!-- Rendu HTML dynamique du succès avec placeholders remplacés -->
     <div
-      v-show="isDisplaying"
-      class="master-overlay-container"
+      v-if="isDisplaying && renderedHtml"
+      class="dynamic-achievement-wrapper"
       :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
-    >
-      <!-- Le rendu du HTML du thème, encapsulé pour ne pas casser la vue -->
-      <div class="theme-wrapper" :class="[tierClass, fxClass]">
-        <div v-html="processedHtml" class="achievement-render-box achievement-card"></div>
-      </div>
-    </div>
+      v-html="renderedHtml"
+    ></div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
-import { sanitizeCss } from '../utils/sanitizeCss.js'
 
 const visualEffectsCss = getVisualEffectsCss()
 
@@ -42,29 +38,10 @@ const currentTheme = ref({
   soundVolume: 0.8
 })
 
-const currentTier = ref('common')
-const currentFx = ref('none')
-
-const tierClass = computed(() => {
-  return currentTier.value === 'master'
-    ? 'tier-master'
-    : (currentTier.value === 'rare' ? 'tier-rare' : 'tier-common')
-})
-
-const fxClass = computed(() => {
-  return currentFx.value && currentFx.value !== 'none'
-    ? `fx-${currentFx.value.replace(/_/g, '-')}`
-    : ''
-})
-
-const currentThemeCss = computed(() => {
-  return sanitizeCss(`${visualEffectsCss}\n${currentTheme.value.css || ''}`)
-})
-
 const isDisplaying = ref(false)
 const isEntering = ref(false)
 const isLeaving = ref(false)
-const processedHtml = ref('')
+const renderedHtml = ref('')
 const isConnected = ref(false)
 const showDebugBanner = ref(true)
 
@@ -153,20 +130,13 @@ function triggerAchievement(data) {
   playNotificationSound()
 
   const tier = data.tier || 'common'
-  currentTier.value = tier
-  currentFx.value = currentTheme.value.visualEffect || 'none'
+  const visualEffect = currentTheme.value.visualEffect || 'none'
 
-  // 1. Remplacement des variables du template
   const rawReplaced = replacePlaceholders(currentTheme.value.html, data)
-
-  // 2. Enrichissement avec calque et classes de rareté
-  const enriched = enrichAchievementHtml(rawReplaced, {
+  renderedHtml.value = enrichAchievementHtml(rawReplaced, {
     tier,
-    visualEffect: currentFx.value
+    visualEffect
   })
-
-  // 3. Injection directe du HTML brut (Raw HTML) - Sécurité CSP
-  processedHtml.value = enriched
 
   isDisplaying.value = true
   isEntering.value = true
@@ -179,9 +149,7 @@ function triggerAchievement(data) {
     leaveTimer = setTimeout(() => {
       isDisplaying.value = false
       isLeaving.value = false
-      processedHtml.value = ''
-      currentTier.value = 'common'
-      currentFx.value = 'none'
+      renderedHtml.value = ''
     }, 400)
   }, 5000)
 }
@@ -205,17 +173,17 @@ function replacePlaceholders(template, data) {
   const game = (data.gameName || data.game || data.game_name || 'Steam').toString()
 
   let html = template
-    .replace(/\{title\}/g, title)
-    .replace(/\{description\}/g, description)
-    .replace(/\{icon\}/g, icon)
-    .replace(/\{iconUrl\}/g, icon)
-    .replace(/\{icon_url\}/g, icon)
-    .replace(/\{image\}/g, icon)
-    .replace(/\{img\}/g, icon)
-    .replace(/\{game\}/g, game)
-    .replace(/\{tier\}/g, tier)
-    .replace(/\{tierLabel\}/g, defaultBadge)
-    .replace(/\{rarity\}/g, rarity)
+    .replace(/\{title\}/gi, title)
+    .replace(/\{description\}/gi, description)
+    .replace(/\{icon\}/gi, icon)
+    .replace(/\{iconUrl\}/gi, icon)
+    .replace(/\{icon_url\}/gi, icon)
+    .replace(/\{image\}/gi, icon)
+    .replace(/\{img\}/gi, icon)
+    .replace(/\{game\}/gi, game)
+    .replace(/\{tier\}/gi, tier)
+    .replace(/\{tierLabel\}/gi, defaultBadge)
+    .replace(/\{rarity\}/gi, rarity)
 
   if (tier !== 'common') {
     html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge)
@@ -334,40 +302,12 @@ onUnmounted(() => {
   box-shadow: 0 0 6px #a1cd44;
 }
 
-.master-overlay-container {
-  /* Fixé en bas à droite pour la source navigateur OBS */
+.dynamic-achievement-wrapper {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9999;
+  bottom: 0;
+  right: 0;
   pointer-events: none;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
   will-change: transform, opacity;
   transform: translateZ(0);
-}
-
-.theme-wrapper {
-  position: relative;
-}
-
-/* Animations de transition */
-.animate-enter {
-  animation: ach-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-leave {
-  animation: ach-slide-down 0.35s cubic-bezier(0.7, 0, 0.84, 0) forwards;
-}
-
-@keyframes ach-slide-up {
-  from { opacity: 0; transform: translateY(40px) scale(0.94); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes ach-slide-down {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(30px) scale(0.96); }
 }
 </style>

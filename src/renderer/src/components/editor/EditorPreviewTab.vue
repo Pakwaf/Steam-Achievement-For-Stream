@@ -29,24 +29,20 @@
     </div>
 
     <!-- Style universel des effets et tiers + style du thème injecté -->
-    <component is="style" type="text/css">
-      {{ safeCss }}
+    <component :is="'style'">
+      {{ visualEffectsCss }}
+      {{ themeCss || '' }}
     </component>
 
     <div class="preview-backdrop">
       <div class="preview-watermark">Aperçu en direct ({{ selectedPreviewTierName }})</div>
-      <div class="preview-slot">
-        <div v-html="processedHtml" class="achievement-preview-box"></div>
-      </div>
+      <div class="preview-slot" v-html="previewHtml"></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { sanitizeCss } from '../../utils/sanitizeCss.js'
-
-const props = defineProps({
+defineProps({
   selectedPreviewTier: {
     type: String,
     default: 'common'
@@ -70,14 +66,6 @@ const props = defineProps({
 })
 
 defineEmits(['update:selectedPreviewTier'])
-
-const processedHtml = computed(() => {
-  return props.previewHtml
-})
-
-const safeCss = computed(() => {
-  return sanitizeCss(`${props.visualEffectsCss || ''}\n${props.themeCss || ''}`)
-})
 </script>
 
 <style scoped>

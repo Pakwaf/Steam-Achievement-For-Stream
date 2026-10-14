@@ -1,17 +1,16 @@
 <template>
   <div class="theme-card-preview-viewport">
-    <component is="style" type="text/css">
-      {{ safeCss }}
+    <component :is="'style'">
+      {{ css || '' }}
     </component>
     <div class="theme-preview-scale-wrapper">
-      <div v-html="processedHtml" class="achievement-preview-render"></div>
+      <div v-html="renderedHtml" class="achievement-preview-render"></div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { sanitizeCss } from '../utils/sanitizeCss.js'
 
 const props = defineProps({
   html: {
@@ -36,22 +35,14 @@ const dummyData = {
 const renderedHtml = computed(() => {
   if (!props.html) return '<div style="color: #6a7c93; font-size: 13px;">Aucun HTML défini</div>'
   return props.html
-    .replace(/\{title\}/g, dummyData.title)
-    .replace(/\{description\}/g, dummyData.description)
-    .replace(/\{icon\}/g, dummyData.icon)
-    .replace(/\{iconUrl\}/g, dummyData.icon)
-    .replace(/\{icon_url\}/g, dummyData.icon)
-    .replace(/\{image\}/g, dummyData.icon)
-    .replace(/\{img\}/g, dummyData.icon)
-    .replace(/\{game\}/g, dummyData.game)
-})
-
-const processedHtml = computed(() => {
-  return renderedHtml.value
-})
-
-const safeCss = computed(() => {
-  return sanitizeCss(props.css || '')
+    .replace(/\{title\}/gi, dummyData.title)
+    .replace(/\{description\}/gi, dummyData.description)
+    .replace(/\{icon\}/gi, dummyData.icon)
+    .replace(/\{iconUrl\}/gi, dummyData.icon)
+    .replace(/\{icon_url\}/gi, dummyData.icon)
+    .replace(/\{image\}/gi, dummyData.icon)
+    .replace(/\{img\}/gi, dummyData.icon)
+    .replace(/\{game\}/gi, dummyData.game)
 })
 </script>
 
