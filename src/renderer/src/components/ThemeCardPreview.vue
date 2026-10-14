@@ -1,12 +1,11 @@
 <template>
   <div class="theme-card-preview-viewport">
-    <iframe
-      :srcdoc="srcDoc"
-      class="preview-iframe"
-      sandbox="allow-same-origin"
-      tabindex="-1"
-      scrolling="no"
-    ></iframe>
+    <component :is="'style'">
+      {{ css || '' }}
+    </component>
+    <div class="theme-preview-scale-wrapper">
+      <div v-html="renderedHtml" class="achievement-preview-render"></div>
+    </div>
   </div>
 </template>
 
@@ -33,74 +32,17 @@ const dummyData = {
   icon: fallbackIcon
 }
 
-function escapeHtml(text) {
-  if (!text) return ''
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
-  return text.toString().replace(/[&<>"']/g, (m) => map[m])
-}
-
 const renderedHtml = computed(() => {
   if (!props.html) return '<div style="color: #6a7c93; font-size: 13px;">Aucun HTML défini</div>'
   return props.html
-    .replace(/\{title\}/gi, escapeHtml(dummyData.title))
-    .replace(/\{description\}/gi, escapeHtml(dummyData.description))
+    .replace(/\{title\}/gi, dummyData.title)
+    .replace(/\{description\}/gi, dummyData.description)
     .replace(/\{icon\}/gi, dummyData.icon)
-    .replace(/\{game\}/gi, escapeHtml(dummyData.game))
-})
-
-const srcDoc = computed(() => {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: transparent !important;
-      overflow: hidden;
-      font-family: 'Outfit', -apple-system, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-    }
-
-    /* Neutralisation du positionnement fixe pour affichage parfait centré dans la vignette */
-    .custom-achievement-card,
-    .cyber-achievement-card,
-    .minimal-achievement-card,
-    div[class*="achievement-card"],
-    div[class*="card"] {
-      position: relative !important;
-      top: auto !important;
-      bottom: auto !important;
-      left: auto !important;
-      right: auto !important;
-      margin: 0 auto !important;
-      transform: none !important;
-    }
-
-    img, .ach-icon, .mini-icon, .cyber-icon {
-      max-width: 64px !important;
-      max-height: 64px !important;
-      object-fit: cover !important;
-      border-radius: 8px !important;
-    }
-
-    ${props.css || ''}
-  </style>
-</head>
-<body>
-  ${renderedHtml.value}
-</body>
-</html>`
+    .replace(/\{iconUrl\}/gi, dummyData.icon)
+    .replace(/\{icon_url\}/gi, dummyData.icon)
+    .replace(/\{image\}/gi, dummyData.icon)
+    .replace(/\{img\}/gi, dummyData.icon)
+    .replace(/\{game\}/gi, dummyData.game)
 })
 </script>
 
@@ -120,13 +62,37 @@ const srcDoc = computed(() => {
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
-.preview-iframe {
+.theme-preview-scale-wrapper {
   width: 440px;
-  height: 130px;
-  border: none;
-  background: transparent !important;
   transform: scale(0.66);
   transform-origin: center center;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Neutralisation du positionnement fixe pour affichage parfait centré dans la vignette */
+.theme-card-preview-viewport :deep(.custom-achievement-card),
+.theme-card-preview-viewport :deep(.cyber-achievement-card),
+.theme-card-preview-viewport :deep(.minimal-achievement-card),
+.theme-card-preview-viewport :deep(div[class*="achievement-card"]),
+.theme-card-preview-viewport :deep(div[class*="card"]) {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 auto !important;
+  transform: none !important;
+}
+
+.theme-card-preview-viewport :deep(img),
+.theme-card-preview-viewport :deep(.ach-icon),
+.theme-card-preview-viewport :deep(.mini-icon),
+.theme-card-preview-viewport :deep(.cyber-icon) {
+  max-width: 64px !important;
+  max-height: 64px !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
 }
 </style>

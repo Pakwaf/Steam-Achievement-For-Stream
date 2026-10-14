@@ -29,14 +29,13 @@
     </div>
 
     <!-- Style universel des effets et tiers + style du thème injecté -->
-    <component is="style" type="text/css">
+    <component :is="'style'">
       {{ visualEffectsCss }}
       {{ themeCss || '' }}
     </component>
 
     <div class="preview-backdrop">
       <div class="preview-watermark">Aperçu en direct ({{ selectedPreviewTierName }})</div>
-      <!-- Slot d'aperçu dynamique -->
       <div class="preview-slot" v-html="previewHtml"></div>
     </div>
   </div>
@@ -163,7 +162,7 @@ defineEmits(['update:selectedPreviewTier'])
   width: 100%;
 }
 
-/* Neutralisation du positionnement fixe pour affichage centré dans la zone d'aperçu */
+/* Neutralisation du positionnement fixe pour affichage parfait centré dans la zone d'aperçu */
 .preview-slot :deep(.custom-achievement-card),
 .preview-slot :deep(.cyber-achievement-card),
 .preview-slot :deep(.minimal-achievement-card),
@@ -178,7 +177,6 @@ defineEmits(['update:selectedPreviewTier'])
   transform: none !important;
 }
 
-/* Protection des dimensions d'icône dans l'aperçu */
 .preview-slot :deep(img),
 .preview-slot :deep(.ach-icon),
 .preview-slot :deep(.mini-icon),
@@ -186,6 +184,6 @@ defineEmits(['update:selectedPreviewTier'])
   max-width: 64px !important;
   max-height: 64px !important;
   object-fit: cover !important;
-  border-radius: 10px !important;
+  border-radius: 8px !important;
 }
 </style>
