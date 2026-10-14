@@ -14,6 +14,10 @@ function replacePlaceholders(template, data) {
     ? '🏆 JEU COMPLÉTÉ (100%)'
     : (tier === ACHIEVEMENT_TIERS_KEYS.RARE ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ')
   const rarityText = data.rarityPercent ? (data.rarityPercent + '%') : (tier === ACHIEVEMENT_TIERS_KEYS.RARE ? '4.8%' : '42.5%')
+  const rawPlaytime = data.playtime_hours ?? data.playtimeHours ?? null
+  const playtimeStr = (rawPlaytime !== null && rawPlaytime !== undefined && rawPlaytime !== '')
+    ? `${rawPlaytime}h`
+    : ''
 
   const title = (data.displayName || data.title || data.name || 'Succès Débloqué').toString()
   const description = (data.description || data.desc || '').toString()
@@ -37,6 +41,7 @@ function replacePlaceholders(template, data) {
     .replace(/\{tier\}/gi, tier)
     .replace(/\{tierLabel\}/gi, defaultBadge)
     .replace(/\{rarity\}/gi, rarityText)
+    .replace(/\{playtime\}/gi, playtimeStr)
 
   if (tier !== ACHIEVEMENT_TIERS_KEYS.COMMON) {
     html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge)

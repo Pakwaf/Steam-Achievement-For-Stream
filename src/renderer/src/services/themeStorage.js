@@ -145,13 +145,15 @@ class ThemeStorageService {
         if (deletedIds.includes(builtin.id)) {
           continue
         }
-        const existsInLoaded = loaded.themes.some((t) => t.id === builtin.id)
-        if (!existsInLoaded) {
+        const existingTheme = loaded.themes.find((t) => t.id === builtin.id)
+        if (!existingTheme) {
           loaded.themes.push({
             ...builtin,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           })
+        } else if (builtin.tiers && (!existingTheme.tiers || Object.keys(existingTheme.tiers).length === 0)) {
+          existingTheme.tiers = JSON.parse(JSON.stringify(builtin.tiers))
         }
       }
 

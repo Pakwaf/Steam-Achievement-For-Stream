@@ -188,7 +188,43 @@ export const STEAM_GOLD_THEME = {
   audioPath: null,
   audioDeviceId: 'default',
   soundEnabled: true,
-  soundVolume: 0.8
+  soundVolume: 0.8,
+  tiers: {
+    master: {
+      html: `<div class="custom-achievement-card tier-master">
+  <div class="card-glow"></div>
+  <div class="card-body">
+    <div class="icon-container">
+      <img src="{icon}" alt="{title}" class="ach-icon" />
+      <div class="icon-sheen"></div>
+    </div>
+    <div class="text-content">
+      <div class="meta-line">
+        <span class="game-tag">{game}</span>
+        <span class="unlock-tag">🏆 100% PLATINE</span>
+      </div>
+      <h3 class="ach-title">{title}</h3>
+      <p class="ach-desc">{description}</p>
+      <div class="master-playtime-badge">Complété en {playtime}</div>
+    </div>
+  </div>
+  <div class="progress-countdown"></div>
+</div>`,
+      css: `.master-playtime-badge {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}`
+    }
+  }
 }
 
 export const DEFAULT_THEME = STEAM_GOLD_THEME

@@ -427,6 +427,18 @@ impl AchievementTracker {
             return;
         }
 
+        let total_achievements = achievements.len();
+        let achieved_count = achievements
+            .iter()
+            .filter(|a| a.get("achieved").and_then(|v| v.as_i64()).unwrap_or(0) == 1)
+            .count();
+        let is_master = total_achievements > 0 && achieved_count >= total_achievements;
+
+        let mut master_playtime: Option<f32> = None;
+        if is_master {
+            master_playtime = self.fetch_game_playtime_hours(app_id, &key, &sid).await;
+        }
+
         // Vérification des nouveaux succès débloqués
         for a in achievements {
             let achieved = a.get("achieved").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -439,7 +451,7 @@ impl AchievementTracker {
                         let provided_name = a.get("name").and_then(|v| v.as_str());
                         let provided_desc = a.get("description").and_then(|v| v.as_str());
 
-                        let meta = self
+                        let mut meta = self
                             .resolve_achievement_metadata(
                                 app_id,
                                 apiname,
@@ -447,6 +459,11 @@ impl AchievementTracker {
                                 provided_desc,
                             )
                             .await;
+
+                        if is_master {
+                            meta.tier = Some("master".to_string());
+                            meta.playtime_hours = master_playtime;
+                        }
 
                         let _ = app.emit("steam:achievement-unlocked", &meta);
                         obs.broadcast_achievement(&meta);
@@ -509,7 +526,63 @@ impl AchievementTracker {
             preview_theme: None,
             tier: Some("common".to_string()),
             rarity_percent: None,
+            playtime_hours: None,
         }
+    }
+
+    pub async fn fetch_game_playtime_hours(
+        &self,
+        app_id: &str,
+        api_key: &str,
+        steam_id: &str,
+    ) -> Option<f32> {
+        // 1. Essai avec GetRecentlyPlayedGames
+        let url_recent = format!(
+            "https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key={}&steamid={}&count=10",
+            api_key, steam_id
+        );
+        if let Ok(res) = self.client.get(&url_recent).send().await {
+            if res.status().is_success() {
+                if let Ok(data) = res.json::<Value>().await {
+                    if let Some(games) = data.pointer("/response/games").and_then(|v| v.as_array()) {
+                        for g in games {
+                            let g_appid = g.get("appid").and_then(|v| v.as_i64()).map(|id| id.to_string());
+                            if g_appid.as_deref() == Some(app_id) {
+                                if let Some(minutes) = g.get("playtime_forever").and_then(|v| v.as_f64()) {
+                                    let hours = ((minutes / 60.0) * 10.0).round() / 10.0;
+                                    return Some(hours as f32);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Fallback avec GetOwnedGames (inclut tous les jeux possédés / F2P joués)
+        let url_owned = format!(
+            "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&include_played_free_games=1&appids_filter[0]={}",
+            api_key, steam_id, app_id
+        );
+        if let Ok(res) = self.client.get(&url_owned).send().await {
+            if res.status().is_success() {
+                if let Ok(data) = res.json::<Value>().await {
+                    if let Some(games) = data.pointer("/response/games").and_then(|v| v.as_array()) {
+                        for g in games {
+                            let g_appid = g.get("appid").and_then(|v| v.as_i64()).map(|id| id.to_string());
+                            if g_appid.as_deref() == Some(app_id) {
+                                if let Some(minutes) = g.get("playtime_forever").and_then(|v| v.as_f64()) {
+                                    let hours = ((minutes / 60.0) * 10.0).round() / 10.0;
+                                    return Some(hours as f32);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     async fn get_or_fetch_schema(&self, app_id: &str, api_key: Option<&str>) -> Option<Value> {
@@ -584,6 +657,16 @@ impl AchievementTracker {
             .resolve_achievement_metadata(app_id, achievement_code, None, None)
             .await;
         ach.is_test = true;
+
+        let code_upper = achievement_code.to_uppercase();
+        if code_upper.contains("MASTER") || achievement_code == "100_PERCENT_MASTER" {
+            ach.tier = Some("master".to_string());
+            ach.playtime_hours = Some(142.5);
+            ach.rarity_percent = Some(1.2);
+        } else if code_upper.contains("RARE") {
+            ach.tier = Some("rare".to_string());
+            ach.rarity_percent = Some(4.8);
+        }
 
         let _ = app.emit("steam:achievement-unlocked", &ach);
         obs.broadcast_achievement(&ach);

@@ -43,6 +43,10 @@ const renderedHtml = computed(() => {
     .replace(/\{image\}/gi, dummyData.icon)
     .replace(/\{img\}/gi, dummyData.icon)
     .replace(/\{game\}/gi, dummyData.game)
+    .replace(/\{tier\}/gi, 'common')
+    .replace(/\{tierLabel\}/gi, 'SUCCÈS DÉBLOQUÉ')
+    .replace(/\{rarity\}/gi, '42.5%')
+    .replace(/\{playtime\}/gi, '')
 })
 </script>
 

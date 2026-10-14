@@ -242,5 +242,53 @@ export const DARK_FANTASY_THEME = {
   audioPath: null,
   audioDeviceId: 'default',
   soundEnabled: true,
-  soundVolume: 0.8
+  soundVolume: 0.8,
+  tiers: {
+    master: {
+      html: `<div class="souls-card tier-master">
+  <div class="souls-ember-glow"></div>
+  <div class="souls-header">
+    <div class="souls-header-left">
+      <span class="souls-rune-symbol">⚔</span>
+      <span class="souls-game-tag">{game}</span>
+    </div>
+    <span class="souls-status-tag">👑 CHEF-D'ŒUVRE ACCOMPLI (100%) 👑</span>
+  </div>
+  <div class="souls-body">
+    <div class="souls-relic-box">
+      <div class="souls-relic-flame"></div>
+      <div class="souls-icon-frame">
+        <img src="{icon}" alt="{title}" class="souls-icon" />
+        <div class="souls-icon-sheen"></div>
+      </div>
+      <div class="souls-corner tl"></div>
+      <div class="souls-corner tr"></div>
+      <div class="souls-corner bl"></div>
+      <div class="souls-corner br"></div>
+    </div>
+    <div class="souls-content">
+      <h3 class="souls-title">{title}</h3>
+      <div class="souls-divider">
+        <span class="souls-gem">◆</span>
+      </div>
+      <p class="souls-desc">{description}</p>
+      <div class="souls-playtime-tag">Temps de quête : {playtime}</div>
+    </div>
+  </div>
+  <div class="souls-ember-track">
+    <div class="souls-ember-bar"></div>
+  </div>
+</div>`,
+      css: `.souls-playtime-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #38bdf8;
+  letter-spacing: 0.08em;
+  font-family: 'Cinzel', serif;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}`
+    }
+  }
 }

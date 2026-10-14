@@ -281,6 +281,22 @@
               <code>{tierLabel}</code>
               <span>Badge texte (ex: SUCCÈS RARE)</span>
             </button>
+            <button
+              class="placeholder-chip"
+              title="Cliquer pour insérer {rarity}"
+              @click="insertPlaceholder('{rarity}')"
+            >
+              <code>{rarity}</code>
+              <span>Rareté mondiale (ex: 4.8%)</span>
+            </button>
+            <button
+              class="placeholder-chip"
+              title="Cliquer pour insérer {playtime}"
+              @click="insertPlaceholder('{playtime}')"
+            >
+              <code>{playtime}</code>
+              <span>Temps de jeu Platine (ex: 142.5h)</span>
+            </button>
           </div>
         </div>
       </div>

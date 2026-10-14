@@ -197,6 +197,11 @@ export function useThemeEditor(props, emit) {
       icon = icon.replace('http://', 'https://')
     }
 
+    const rawPlaytime = activeTier === ACHIEVEMENT_TIERS_KEYS.MASTER ? (tierMeta.defaultPlaytime || 142.5) : null
+    const playtimeStr = (rawPlaytime !== null && rawPlaytime !== undefined && rawPlaytime !== '')
+      ? `${rawPlaytime}h`
+      : ''
+
     let html = htmlTemplate
       .replace(/\{title\}/gi, tierMeta.defaultTitle)
       .replace(/\{description\}/gi, tierMeta.defaultDesc)
@@ -209,6 +214,7 @@ export function useThemeEditor(props, emit) {
       .replace(/\{tier\}/gi, activeTier)
       .replace(/\{tierLabel\}/gi, tierMeta.defaultBadge)
       .replace(/\{rarity\}/gi, tierMeta.defaultPercent + '%')
+      .replace(/\{playtime\}/gi, playtimeStr)
 
     if (activeTier !== ACHIEVEMENT_TIERS_KEYS.COMMON) {
       html = html.replace(/SUCCÈS DÉBLOQUÉ/g, tierMeta.defaultBadge)
@@ -358,6 +364,8 @@ export function useThemeEditor(props, emit) {
         icon: tierMeta.icon,
         tier,
         rarityPercent: tierMeta.defaultPercent,
+        playtimeHours: tier === ACHIEVEMENT_TIERS_KEYS.MASTER ? (tierMeta.defaultPlaytime || 142.5) : null,
+        playtime_hours: tier === ACHIEVEMENT_TIERS_KEYS.MASTER ? (tierMeta.defaultPlaytime || 142.5) : null,
         previewTheme: {
           id: theme.value.id,
           name: theme.value.name,

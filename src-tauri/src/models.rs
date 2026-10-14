@@ -43,6 +43,8 @@ pub struct Achievement {
     pub rarity_percent: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_theme: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "playtime_hours")]
+    pub playtime_hours: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

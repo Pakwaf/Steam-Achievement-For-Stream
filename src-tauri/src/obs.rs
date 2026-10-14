@@ -959,6 +959,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         ? '🏆 JEU COMPLÉTÉ (100%)' 
         : (tier === 'rare' ? '★ SUCCÈS RARE (< 10%)' : 'SUCCÈS DÉBLOQUÉ');
       const rarityText = item.rarityPercent ? (item.rarityPercent + '%') : (tier === 'rare' ? '4.8%' : '42.5%');
+      const rawPlaytime = item.playtime_hours !== undefined ? item.playtime_hours : item.playtimeHours;
+      const playtimeStr = (rawPlaytime !== null && rawPlaytime !== undefined && rawPlaytime !== '') ? (rawPlaytime + 'h') : '';
 
       let html = template
         .replace(/\{{title\}}/gi, escapeHtml(item.displayName || 'Succès Débloqué'))
@@ -967,7 +969,8 @@ async fn obs_html_handler(State(server): State<Arc<ObsServer>>) -> Html<String> 
         .replace(/\{{game\}}/gi, escapeHtml(item.gameName || 'Steam'))
         .replace(/\{{tier\}}/gi, tier)
         .replace(/\{{tierLabel\}}/gi, defaultBadge)
-        .replace(/\{{rarity\}}/gi, rarityText);
+        .replace(/\{{rarity\}}/gi, rarityText)
+        .replace(/\{{playtime\}}/gi, playtimeStr);
 
       if (tier !== 'common') {{
         html = html.replace(/SUCCÈS DÉBLOQUÉ/g, defaultBadge);
