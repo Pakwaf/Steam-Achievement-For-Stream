@@ -51,34 +51,8 @@
 
       <!-- État 2 : Utilisateur connecté -->
       <section v-else class="dashboard-section">
-        <!-- 3. Carte Profil Utilisateur -->
-        <ProfileCard
-          :current-user="currentUser"
-          :copied="copied"
-          :fallback-icon="fallbackIcon"
-          @copy-steam-id="copySteamId"
-          @open-api-key-modal="openApiKeyModal"
-          @open-steam-profile="openSteamProfile"
-          @logout="handleLogout"
-        />
-
-        <!-- 4. Panneau de Double Affichage (Overlay Desktop & OBS) -->
-        <DisplaySystemsCard
-          :obs-status="obsStatus"
-          :obs-url="obsUrl"
-          :obs-copied="obsCopied"
-          :obs-lan-copied="obsLanCopied"
-          :obs-localhost-copied="obsLocalhostCopied"
-          @open-port-modal="openPortModal"
-          @copy-obs-url="copyObsUrl"
-          @copy-obs-url-lan="copyObsUrlLan"
-          @copy-obs-url-localhost="copyObsUrlLocalhost"
-          @open-obs-in-browser="openObsInBrowser"
-          @open-obs-lan-in-browser="openObsLanInBrowser"
-        />
-
-        <!-- 5. Bibliothèque de Thèmes & Éditeur Modulaire -->
-        <div v-if="currentView === 'editor'" class="editor-view-wrapper">
+        <!-- VUE A : Éditeur Custom Expert (Pleine page) -->
+        <div v-if="currentView === 'editor'" class="editor-view-wrapper full-page-view">
           <CustomizationEditor
             :target-theme="editingTheme"
             :is-active-theme="editingTheme?.id === themeLibrary.activeThemeId"
@@ -88,34 +62,71 @@
           />
         </div>
 
-        <ThemeStudioGallery
-          v-else
-          :theme-library="themeLibrary"
-          :status-message="libraryStatusMessage"
-          @activate-theme="handleActivateTheme"
-          @edit-theme="handleEditTheme"
-          @duplicate-theme="handleDuplicateTheme"
-          @delete-theme="handleDeleteTheme"
-          @restore-default-themes="handleRestoreDefaultThemes"
-          @export-theme="handleExportTheme"
-          @export-library="handleExportLibrary"
-          @import-theme-file="handleThemeFileImport"
-          @create-new-theme="handleCreateNewTheme"
-        />
+        <!-- VUE B : Générateur Visuel Rapide (Pleine page) -->
+        <div v-else-if="currentView === 'quick-builder'" class="editor-view-wrapper full-page-view">
+          <QuickThemeBuilder
+            @back="closeQuickBuilder"
+            @saved="onQuickThemeSaved"
+          />
+        </div>
 
-        <!-- 6. Panneau de Contrôle & Diagnostic du Tracker -->
-        <TrackerCard
-          :tracker-status="trackerStatus"
-          :is-simulating="isSimulating"
-          @trigger-tier-test="triggerDashboardTierTest"
-        />
+        <!-- VUE C : Page d'accueil Dashboard (Profil, OBS, Galerie, Tracker & Historique) -->
+        <div v-else class="dashboard-home-wrapper">
+          <!-- 3. Carte Profil Utilisateur -->
+          <ProfileCard
+            :current-user="currentUser"
+            :copied="copied"
+            :fallback-icon="fallbackIcon"
+            @copy-steam-id="copySteamId"
+            @open-api-key-modal="openApiKeyModal"
+            @open-steam-profile="openSteamProfile"
+            @logout="handleLogout"
+          />
 
-        <!-- 7. Historique des succès de la session -->
-        <AchievementHistory
-          :unlocked-history="unlockedHistory"
-          :fallback-icon="fallbackIcon"
-          @clear-history="unlockedHistory = []"
-        />
+          <!-- 4. Panneau de Double Affichage (Overlay Desktop & OBS) -->
+          <DisplaySystemsCard
+            :obs-status="obsStatus"
+            :obs-url="obsUrl"
+            :obs-copied="obsCopied"
+            :obs-lan-copied="obsLanCopied"
+            :obs-localhost-copied="obsLocalhostCopied"
+            @open-port-modal="openPortModal"
+            @copy-obs-url="copyObsUrl"
+            @copy-obs-url-lan="copyObsUrlLan"
+            @copy-obs-url-localhost="copyObsUrlLocalhost"
+            @open-obs-in-browser="openObsInBrowser"
+            @open-obs-lan-in-browser="openObsLanInBrowser"
+          />
+
+          <!-- 5. Bibliothèque de Thèmes & Galerie Studio -->
+          <ThemeStudioGallery
+            :theme-library="themeLibrary"
+            :status-message="libraryStatusMessage"
+            @activate-theme="handleActivateTheme"
+            @edit-theme="handleEditTheme"
+            @duplicate-theme="handleDuplicateTheme"
+            @delete-theme="handleDeleteTheme"
+            @restore-default-themes="handleRestoreDefaultThemes"
+            @export-theme="handleExportTheme"
+            @export-library="handleExportLibrary"
+            @import-theme-file="handleThemeFileImport"
+            @create-new-theme="handleCreateNewThemeClick"
+          />
+
+          <!-- 6. Panneau de Contrôle & Diagnostic du Tracker -->
+          <TrackerCard
+            :tracker-status="trackerStatus"
+            :is-simulating="isSimulating"
+            @trigger-tier-test="triggerDashboardTierTest"
+          />
+
+          <!-- 7. Historique des succès de la session -->
+          <AchievementHistory
+            :unlocked-history="unlockedHistory"
+            :fallback-icon="fallbackIcon"
+            @clear-history="unlockedHistory = []"
+          />
+        </div>
       </section>
 
       <!-- 8. Modals modulaires -->
@@ -141,10 +152,12 @@
         :audio-devices-list="audioDevicesList"
         :obs-status="obsStatus"
         :obs-port="modalPortValue"
+        :tracker-status="trackerStatus"
         :isPlayingTest="isPlayingGlobalTest"
         :status-message="generalSettingsMessage"
         @close="closeGeneralSettingsModal"
         @test-audio="testGlobalAudioOutput"
+        @open-api-key="openApiKeyModal"
         @save="saveGeneralSettings"
       />
 
@@ -162,6 +175,14 @@
         :error-message="updaterErrorMessage"
         @close="closeUpdateModal"
         @install="downloadAndInstall"
+      />
+
+      <!-- 10. Modal de choix de création de thème (Mode Rapide vs Mode Custom) -->
+      <CreateThemeChoiceModal
+        :is-open="showCreateChoiceModal"
+        @close="closeCreateChoiceModal"
+        @select-quick="selectQuickBuilder"
+        @select-custom="selectCustomEditor"
       />
     </main>
   </div>
@@ -182,6 +203,8 @@ import ThemeStudioGallery from '../components/studio/ThemeStudioGallery.vue'
 
 // Composants asynchrones chargés à la demande (Lazy Loading pour réduire le bundle)
 const CustomizationEditor = defineAsyncComponent(() => import('../components/CustomizationEditor.vue'))
+const QuickThemeBuilder = defineAsyncComponent(() => import('../components/studio/QuickThemeBuilder.vue'))
+const CreateThemeChoiceModal = defineAsyncComponent(() => import('../components/modals/CreateThemeChoiceModal.vue'))
 const ApiKeyModal = defineAsyncComponent(() => import('../components/modals/ApiKeyModal.vue'))
 const PortModal = defineAsyncComponent(() => import('../components/modals/PortModal.vue'))
 const GeneralSettingsModal = defineAsyncComponent(() => import('../components/modals/GeneralSettingsModal.vue'))
@@ -262,6 +285,13 @@ const {
   handleExportTheme,
   handleExportLibrary,
   handleCreateNewTheme,
+  showCreateChoiceModal,
+  handleCreateNewThemeClick,
+  closeCreateChoiceModal,
+  selectQuickBuilder,
+  selectCustomEditor,
+  closeQuickBuilder,
+  onQuickThemeSaved,
   closeEditor,
   onEditorThemeSaved
 } = useThemeLibrary()
@@ -470,6 +500,16 @@ function onIconError(e) {
 .editor-view-wrapper {
   animation: fadeIn 0.3s ease-out;
   margin-bottom: 2rem;
+}
+
+.full-page-view {
+  width: 100%;
+}
+
+.dashboard-home-wrapper {
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {

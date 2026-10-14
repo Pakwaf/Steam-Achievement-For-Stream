@@ -35,7 +35,7 @@
         <button class="btn-export-all" title="Exporter tous vos thèmes dans une sauvegarde JSON" @click="$emit('export-library')">
           <span>📤 Sauvegarder tout</span>
         </button>
-        <button class="btn-restore-themes" title="Restaurer les thèmes officiels (Steam Gold, Cozy, Horror, Dark Fantasy, Frutiger Aero)" @click="$emit('restore-default-themes')">
+        <button class="btn-restore-themes" title="Restaurer le thème officiel Steam Gold" @click="$emit('restore-default-themes')">
           <span class="restore-icon">↺</span>
           <span>Restaurer</span>
         </button>

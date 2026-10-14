@@ -9,13 +9,14 @@
     <!-- Style CSS universel (effets, tiers) + CSS du thème injecté -->
     <component :is="'style'">
       {{ visualEffectsCss }}
-      {{ currentTheme.css || '' }}
+      {{ activePreviewTheme?.css || currentTheme.css || '' }}
+      {{ currentTierOverrideCss }}
     </component>
 
-    <!-- Rendu HTML dynamique du succès avec placeholders remplacés -->
+    <!-- Rendu HTML dynamique du succès avec placeholders remplacés (forcé en bas à droite) -->
     <div
       v-if="isDisplaying && renderedHtml"
-      class="dynamic-achievement-wrapper"
+      class="dynamic-achievement-wrapper master-overlay-container"
       :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
       v-html="renderedHtml"
     ></div>
@@ -38,6 +39,8 @@ const currentTheme = ref({
   soundVolume: 0.8
 })
 
+const activePreviewTheme = ref(null)
+const currentTierOverrideCss = ref('')
 const isDisplaying = ref(false)
 const isEntering = ref(false)
 const isLeaving = ref(false)
@@ -127,16 +130,30 @@ function triggerAchievement(data) {
   if (dismissTimer) clearTimeout(dismissTimer)
   if (leaveTimer) clearTimeout(leaveTimer)
 
+  const effectiveTheme = data.previewTheme || currentTheme.value
+  activePreviewTheme.value = data.previewTheme || null
+
   playNotificationSound()
 
   const tier = data.tier || 'common'
-  const visualEffect = currentTheme.value.visualEffect || 'none'
+  const visualEffect = effectiveTheme.visualEffect || 'none'
 
-  const rawReplaced = replacePlaceholders(currentTheme.value.html, data)
+  // Sélection du template adapté au tier (ou fallback)
+  const tierHtml = effectiveTheme.tiers?.[tier]?.html
+  const baseHtml = effectiveTheme.html
+  const tpl = (tierHtml && tierHtml.trim())
+    ? tierHtml
+    : ((baseHtml && baseHtml.trim()) ? baseHtml : '')
+
+  const rawReplaced = replacePlaceholders(tpl, data)
   renderedHtml.value = enrichAchievementHtml(rawReplaced, {
     tier,
     visualEffect
   })
+
+  // CSS de surcharge du tier
+  const tierCss = effectiveTheme.tiers?.[tier]?.css
+  currentTierOverrideCss.value = tierCss || ''
 
   isDisplaying.value = true
   isEntering.value = true
@@ -150,6 +167,8 @@ function triggerAchievement(data) {
       isDisplaying.value = false
       isLeaving.value = false
       renderedHtml.value = ''
+      activePreviewTheme.value = null
+      currentTierOverrideCss.value = ''
     }, 400)
   }, 5000)
 }
@@ -307,10 +326,15 @@ onUnmounted(() => {
   box-shadow: 0 0 6px #a1cd44;
 }
 
-.dynamic-achievement-wrapper {
+.master-overlay-container {
   position: fixed;
-  bottom: 0;
-  right: 0;
+  bottom: 40px;
+  right: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 9999;
   pointer-events: none;
   will-change: transform, opacity;
   transform: translateZ(0);

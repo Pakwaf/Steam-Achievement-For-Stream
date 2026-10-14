@@ -205,7 +205,7 @@ export const STEAM_GOLD_THEME = {
       </div>
       <h3 class="ach-title">{title}</h3>
       <p class="ach-desc">{description}</p>
-      <div class="master-playtime-badge">Complété en {playtime}</div>
+      <div class="master-playtime-badge">Complété à 100% en {playtime}</div>
     </div>
   </div>
   <div class="progress-countdown"></div>

@@ -86,6 +86,73 @@ impl TrackerService {
         Ok(true)
     }
 
+    pub async fn broadcast_draft_achievement(
+        &self,
+        draft_payload: serde_json::Value,
+    ) -> AppResult<bool> {
+        let tier = draft_payload
+            .get("tier")
+            .and_then(|v| v.as_str())
+            .unwrap_or("common");
+
+        let html = draft_payload
+            .get("html")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let css = draft_payload
+            .get("css")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let visual_effect = draft_payload
+            .get("visualEffect")
+            .and_then(|v| v.as_str())
+            .unwrap_or("none");
+
+        let preview_theme = serde_json::json!({
+            "id": "draft-preview",
+            "name": "Brouillon en cours",
+            "html": html,
+            "css": css,
+            "visualEffect": visual_effect,
+            "tiers": draft_payload.get("tiers").cloned().unwrap_or(serde_json::json!({}))
+        });
+
+        let mut ach = serde_json::json!({
+            "appId": "440",
+            "achievementCode": "TF_DRAFT_TEST",
+            "displayName": draft_payload.get("displayName").and_then(|v| v.as_str()).unwrap_or("Succès de Brouillon (Test)"),
+            "description": draft_payload.get("description").and_then(|v| v.as_str()).unwrap_or("Prévisualisation en direct de votre création."),
+            "icon": "https://community.cloudflare.steamstatic.com/public/images/apps/440/e0d16c52a0a2df3087db8c0dc1c05d0cbcc52d2a.jpg",
+            "gameName": "Team Fortress 2",
+            "unlockedAt": tracker::chrono_like_now(),
+            "tier": tier,
+            "rarityPercent": if tier == "rare" { 4.8 } else { 42.5 },
+            "isTest": true,
+            "previewTheme": preview_theme
+        });
+
+        if tier == "master" {
+            ach["playtimeHours"] = serde_json::json!(124.0);
+            ach["playtime_hours"] = serde_json::json!(124.0);
+        }
+
+        // 1. Émettre l'événement Tauri pour l'overlay Desktop
+        self.app
+            .emit("steam:achievement-unlocked", &ach)
+            .map_err(|e| AppError::Internal(format!("Échec émission événement: {e}")))?;
+
+        // 2. Diffuser sur le WebSocket OBS
+        let obs_msg = serde_json::json!({
+            "type": "ACHIEVEMENT_UNLOCKED",
+            "data": &ach
+        });
+        self.obs.broadcast_raw(obs_msg.to_string());
+
+        Ok(true)
+    }
+
     pub async fn start(&self) {
         self.tracker.clone().start(self.app.clone(), self.obs.clone()).await;
     }

@@ -7,10 +7,10 @@
       {{ currentTierOverrideCss }}
     </component>
 
-    <!-- Zone de rendu plein écran pour la notification de succès sur l'écran du joueur -->
+    <!-- Zone de rendu de la notification de succès sur l'écran du joueur (forcée en bas à droite) -->
     <div
       ref="slotRef"
-      class="desktop-achievement-slot"
+      class="desktop-achievement-slot master-overlay-container"
       v-html="renderedHtml"
     ></div>
   </div>
@@ -44,16 +44,16 @@ const {
   position: relative;
 }
 
-.desktop-achievement-slot {
+.master-overlay-container {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
+  bottom: 40px;
+  right: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 9999;
   pointer-events: none;
-  overflow: hidden;
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;

@@ -19,6 +19,7 @@ export const IPC_COMMANDS = Object.freeze({
   SIMULATE_ACHIEVEMENT: 'simulate_achievement',
   GET_OBS_STATUS: 'get_obs_status',
   BROADCAST_TEST_ACHIEVEMENT: 'broadcast_test_achievement',
+  BROADCAST_DRAFT_ACHIEVEMENT: 'broadcast_draft_achievement',
   SELECT_AUDIO_FILE: 'select_audio_file',
   GET_AUDIO_DATA: 'get_audio_data',
   GET_STEAM_API_KEY: 'get_steam_api_key',

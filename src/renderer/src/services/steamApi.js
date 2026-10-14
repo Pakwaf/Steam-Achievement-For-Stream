@@ -162,6 +162,15 @@ export const steamAPI = {
     }
   },
 
+  broadcastDraftAchievement: async (draftData) => {
+    try {
+      await invoke(IPC_COMMANDS.BROADCAST_DRAFT_ACHIEVEMENT, { draftData })
+      return { success: true, draft: draftData }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  },
+
   selectAudioFile: async () => {
     try {
       const filePath = await invoke(IPC_COMMANDS.SELECT_AUDIO_FILE)
