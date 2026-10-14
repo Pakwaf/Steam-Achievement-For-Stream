@@ -52,6 +52,22 @@ impl AudioService {
             }
 
             if path.is_file() {
+                const MAX_AUDIO_BYTES: u64 = 20 * 1024 * 1024; // 20 Mo max
+                if let Ok(meta) = tokio::fs::metadata(&path).await {
+                    if meta.len() > MAX_AUDIO_BYTES {
+                        eprintln!(
+                            "[AudioService] 🚨 Fichier audio trop volumineux ({} octets > 20 Mo max) : {:?}",
+                            meta.len(),
+                            path
+                        );
+                        return Ok(serde_json::json!({
+                            "hasAudio": false,
+                            "dataUrl": null,
+                            "error": "Fichier audio trop volumineux (max 20 Mo)"
+                        }));
+                    }
+                }
+
                 let bytes = tokio::fs::read(&path)
                     .await
                     .map_err(AppError::Io)?;

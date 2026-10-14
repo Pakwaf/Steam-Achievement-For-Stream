@@ -37,10 +37,11 @@ export function useSteamTracker() {
         steamAPI.getTrackerStatus().catch(() => null)
       ])
 
-      // Restauration de la clé API
-      let rawKey = typeof keyRes === 'string' ? keyRes : (keyRes?.apiKey || '')
-      if (!rawKey && typeof localStorage !== 'undefined') {
-        rawKey = localStorage.getItem(STORAGE_KEYS.STEAM_API_KEY) || ''
+      // Restauration de la clé API exclusivement depuis le backend Rust
+      const rawKey = typeof keyRes === 'string' ? keyRes : (keyRes?.apiKey || '')
+      // Nettoyage proactif de tout reliquat dans le localStorage pour la sécurité
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.STEAM_API_KEY)
       }
       const trimmedKey = (rawKey || '').trim()
       if (trimmedKey && trimmedKey.length >= 8) {
@@ -93,9 +94,6 @@ export function useSteamTracker() {
 
     isSavingKey.value = true
     try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.STEAM_API_KEY, keyToSave)
-      }
       await steamAPI.saveSteamApiKey(keyToSave)
       keySavedMessage.value = 'Clé API enregistrée avec succès ! Redirection...'
       setTimeout(() => {

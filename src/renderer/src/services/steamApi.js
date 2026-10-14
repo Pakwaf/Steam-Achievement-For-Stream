@@ -3,6 +3,40 @@ import { listen } from '@tauri-apps/api/event'
 import { themeStorage } from './themeStorage.js'
 import { IPC_EVENTS, IPC_COMMANDS } from '../constants/index.js'
 
+/**
+ * Écouteur d'événement IPC sécurisé avec protection contre les fuites de mémoire.
+ * Garantit que la fonction unlisten de Tauri est invoquée même si le composant Vue
+ * est démonté avant la résolution de la Promesse asynchrone de listen().
+ */
+function safeListen(eventName, callback) {
+  let unlisten = null
+  let disposed = false
+
+  listen(eventName, (event) => {
+    if (!disposed) {
+      callback(event.payload)
+    }
+  })
+    .then((fn) => {
+      if (disposed) {
+        fn()
+      } else {
+        unlisten = fn
+      }
+    })
+    .catch((err) => {
+      console.warn(`[steamAPI] Erreur enregistrement écouteur IPC '${eventName}':`, err)
+    })
+
+  return () => {
+    disposed = true
+    if (unlisten) {
+      unlisten()
+      unlisten = null
+    }
+  }
+}
+
 export const steamAPI = {
   login: async () => {
     try {
@@ -39,29 +73,9 @@ export const steamAPI = {
     }
   },
 
-  onAuthStatusChanged: (callback) => {
-    let unlisten = null
-    listen(IPC_EVENTS.AUTH_STATUS_CHANGED, (event) => {
-      callback(event.payload)
-    }).then((fn) => {
-      unlisten = fn
-    })
-    return () => {
-      if (unlisten) unlisten()
-    }
-  },
+  onAuthStatusChanged: (callback) => safeListen(IPC_EVENTS.AUTH_STATUS_CHANGED, callback),
 
-  onAchievementUnlocked: (callback) => {
-    let unlisten = null
-    listen(IPC_EVENTS.ACHIEVEMENT_UNLOCKED, (event) => {
-      callback(event.payload)
-    }).then((fn) => {
-      unlisten = fn
-    })
-    return () => {
-      if (unlisten) unlisten()
-    }
-  },
+  onAchievementUnlocked: (callback) => safeListen(IPC_EVENTS.ACHIEVEMENT_UNLOCKED, callback),
 
   getTrackerStatus: async () => {
     try {
@@ -104,17 +118,7 @@ export const steamAPI = {
     }
   },
 
-  onObsStatusChanged: (callback) => {
-    let unlisten = null
-    listen(IPC_EVENTS.OBS_STATUS_CHANGED, (event) => {
-      callback(event.payload)
-    }).then((fn) => {
-      unlisten = fn
-    })
-    return () => {
-      if (unlisten) unlisten()
-    }
-  },
+  onObsStatusChanged: (callback) => safeListen(IPC_EVENTS.OBS_STATUS_CHANGED, callback),
 
   // Gestion des thèmes dans le système de fichiers (AppData)
   getThemeLibrary: () => themeStorage.getLibrary(),
@@ -140,16 +144,10 @@ export const steamAPI = {
 
   onCustomizationUpdated: (callback) => {
     const unsubLocal = themeStorage.onCustomizationUpdated(callback)
-    let unlistenEvent = null
-    listen(IPC_EVENTS.CUSTOMIZATION_UPDATED, (event) => {
-      callback(event.payload)
-    }).then((fn) => {
-      unlistenEvent = fn
-    })
-
+    const unsubIpc = safeListen(IPC_EVENTS.CUSTOMIZATION_UPDATED, callback)
     return () => {
       unsubLocal()
-      if (unlistenEvent) unlistenEvent()
+      unsubIpc()
     }
   },
 
