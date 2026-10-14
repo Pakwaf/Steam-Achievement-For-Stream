@@ -12,21 +12,23 @@
       class="master-overlay-container"
       :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
     >
-      <iframe
-        ref="themeIframe"
-        sandbox="allow-same-origin"
-        frameborder="0"
-        scrolling="no"
-        class="theme-iframe"
-      ></iframe>
+      <!-- Le CSS global du thème est injecté ici, sans DOMPurify -->
+      <component is="style" type="text/css">
+        {{ currentThemeCss }}
+      </component>
+
+      <!-- Le rendu du HTML du thème, encapsulé pour ne pas casser la vue -->
+      <div class="theme-wrapper" :class="[tierClass, fxClass]">
+        <div v-html="processedHtml" class="achievement-render-box"></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
-import { getVisualEffectsCss } from '../utils/visualEffects.js'
-import { buildThemeIframeDocument, writeHtmlToIframe } from '../utils/themeDocument.js'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
+import { sanitizeSoft, sanitizeCss } from '../utils/sanitizeSoft.js'
 
 const visualEffectsCss = getVisualEffectsCss()
 
@@ -55,18 +57,16 @@ const fxClass = computed(() => {
     : ''
 })
 
+const currentThemeCss = computed(() => {
+  return sanitizeCss(`${visualEffectsCss}\n${currentTheme.value.css || ''}`)
+})
+
 const isDisplaying = ref(false)
 const isEntering = ref(false)
 const isLeaving = ref(false)
-const fullThemeDocument = ref('')
-const themeIframe = ref(null)
+const processedHtml = ref('')
 const isConnected = ref(false)
 const showDebugBanner = ref(true)
-
-function renderThemeToIframe() {
-  if (!themeIframe.value) return
-  writeHtmlToIframe(themeIframe.value, fullThemeDocument.value)
-}
 
 let socket = null
 let reconnectTimer = null
@@ -159,20 +159,18 @@ function triggerAchievement(data) {
   // 1. Remplacement des variables du template
   const rawReplaced = replacePlaceholders(currentTheme.value.html, data)
 
-  // 2. Assemblage du document autonome pour l'iframe sandbox
-  fullThemeDocument.value = buildThemeIframeDocument({
-    html: rawReplaced,
-    css: currentTheme.value.css || '',
-    visualEffectsCss,
-    tierClass: tierClass.value,
-    fxClass: fxClass.value,
-    center: false
+  // 2. Enrichissement avec calque et classes de rareté
+  const enriched = enrichAchievementHtml(rawReplaced, {
+    tier,
+    visualEffect: currentFx.value
   })
+
+  // 3. Sanitisation douce Safe HTML (sans DOMPurify)
+  processedHtml.value = sanitizeSoft(enriched)
 
   isDisplaying.value = true
   isEntering.value = true
   isLeaving.value = false
-  nextTick(renderThemeToIframe)
 
   dismissTimer = setTimeout(() => {
     isEntering.value = false
@@ -181,8 +179,7 @@ function triggerAchievement(data) {
     leaveTimer = setTimeout(() => {
       isDisplaying.value = false
       isLeaving.value = false
-      fullThemeDocument.value = ''
-      renderThemeToIframe()
+      processedHtml.value = ''
       currentTier.value = 'common'
       currentFx.value = 'none'
     }, 400)
@@ -344,25 +341,21 @@ onUnmounted(() => {
 }
 
 .master-overlay-container {
-  width: 100vw;
-  height: 100vh;
+  /* Fixé en bas à droite pour la source navigateur OBS */
   position: fixed;
-  top: 0;
-  left: 0;
-  margin: 0;
-  padding: 0;
-  background: transparent !important;
-  overflow: hidden;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
   pointer-events: none;
-  z-index: 999999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
-.theme-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent !important;
-  pointer-events: none;
+.theme-wrapper {
+  position: relative;
 }
 
 /* Animations de transition */

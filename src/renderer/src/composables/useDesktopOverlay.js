@@ -1,9 +1,9 @@
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
 import { enrichAchievementHtml, getVisualEffectsCss } from '../utils/visualEffects.js'
-import { buildThemeIframeDocument, writeHtmlToIframe } from '../utils/themeDocument.js'
+import { sanitizeSoft, sanitizeCss } from '../utils/sanitizeSoft.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 const FALLBACK_ICON = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
@@ -54,16 +54,14 @@ function replacePlaceholders(template, data) {
 
 /**
  * Composable pour l'Overlay transparent de bureau (Desktop Overlay).
- * Isole la souscription IPC, l'assemblage de document autonome et l'injection directe sécurisée dans l'iframe.
+ * Rendu natif Vue 3 avec sanitisation douce (Safe HTML) et injection CSS isolée.
  */
 export function useDesktopOverlay() {
   const visualEffectsCss = getVisualEffectsCss()
   const currentTheme = ref({ ...DEFAULT_THEME })
   const activePreviewTheme = ref(null)
   const currentTierOverrideCss = ref('')
-  const fullThemeDocument = ref('')
-  const themeIframe = ref(null)
-  const slotRef = ref(null)
+  const processedHtml = ref('')
 
   const currentTier = ref(ACHIEVEMENT_TIERS_KEYS.COMMON)
   const currentFx = ref('none')
@@ -83,12 +81,12 @@ export function useDesktopOverlay() {
       : ''
   })
 
-  // CSS universel + CSS brut du thème actif + surcharges du tier
+  // CSS universel des tiers/effets + CSS du thème + surcharge du tier actif
   const currentThemeCss = computed(() => {
     const effectiveTheme = activePreviewTheme.value || currentTheme.value || DEFAULT_THEME
     const baseCss = effectiveTheme.css || DEFAULT_THEME.css || ''
     const tierCss = currentTierOverrideCss.value || ''
-    return `${baseCss}\n${tierCss}`
+    return sanitizeCss(`${visualEffectsCss}\n${baseCss}\n${tierCss}`)
   })
 
   let unsubs = []
@@ -107,46 +105,36 @@ export function useDesktopOverlay() {
     currentTier.value = tier
     currentFx.value = effectiveTheme.visualEffect || 'none'
 
-    // 1. Jouer le son
+    // 1. Son
     playAchievementSound(effectiveTheme, tier)
 
-    // 2. Sélection du template HTML adapté au tier (ou fallback base)
+    // 2. Sélection du template HTML
     const tierHtml = effectiveTheme.tiers?.[tier]?.html
     const baseHtml = effectiveTheme.html
     const tpl = (tierHtml && tierHtml.trim())
       ? tierHtml
       : ((baseHtml && baseHtml.trim()) ? baseHtml : DEFAULT_THEME.html)
 
-    // 3. Remplacement des variables {title}, {description}, {icon}, {game}, {tier}, {tierLabel}, {rarity}
-    const processed = replacePlaceholders(tpl, achievement)
+    // 3. Substitution des variables
+    const rawReplaced = replacePlaceholders(tpl, achievement)
 
-    // 4. Enrichir avec calque d'effets visuels
-    const enriched = enrichAchievementHtml(processed, {
+    // 4. Enrichissement calque d'effets visuels
+    const enriched = enrichAchievementHtml(rawReplaced, {
       tier,
-      visualEffect: effectiveTheme.visualEffect || 'none'
+      visualEffect: currentFx.value
     })
 
-    // 5. Mettre à jour le CSS du tier actif
+    // 5. Sanitisation douce (Safe HTML) : neutralise XSS sans détruire le CSS/HTML
+    processedHtml.value = sanitizeSoft(enriched)
+
+    // 6. CSS du tier
     const tierCss = effectiveTheme.tiers?.[tier]?.css || ''
     currentTierOverrideCss.value = tierCss
 
-    const effectiveCss = `${currentThemeCss.value}\n${tierCss}`
-
-    // 6. Génération du document HTML complet sécurisé pour Iframe Sandbox
-    fullThemeDocument.value = buildThemeIframeDocument({
-      html: processed,
-      css: effectiveCss,
-      visualEffectsCss,
-      tierClass: tierClass.value,
-      fxClass: fxClass.value,
-      center: false
-    })
-
-    // 7. Déclenchement de l'affichage et animation d'entrée
+    // 7. Affichage et animation d'entrée
     isDisplaying.value = true
     isEntering.value = true
     isLeaving.value = false
-    nextTick(renderThemeToIframe)
 
     // 8. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
@@ -156,19 +144,13 @@ export function useDesktopOverlay() {
       leaveTimer = setTimeout(() => {
         isDisplaying.value = false
         isLeaving.value = false
-        fullThemeDocument.value = ''
-        renderThemeToIframe()
+        processedHtml.value = ''
         activePreviewTheme.value = null
         currentTierOverrideCss.value = ''
         currentTier.value = ACHIEVEMENT_TIERS_KEYS.COMMON
         currentFx.value = 'none'
       }, 450)
     }, 5000)
-  }
-
-  function renderThemeToIframe() {
-    if (!themeIframe.value) return
-    writeHtmlToIframe(themeIframe.value, fullThemeDocument.value)
   }
 
   onMounted(async () => {
@@ -197,8 +179,6 @@ export function useDesktopOverlay() {
       triggerAchievement(achievement)
     })
     unsubs.push(unsubAch)
-
-    nextTick(renderThemeToIframe)
   })
 
   onUnmounted(() => {
@@ -226,12 +206,9 @@ export function useDesktopOverlay() {
     isLeaving,
     currentTierOverrideCss,
     currentThemeCss,
-    fullThemeDocument,
-    sanitizedHtml: fullThemeDocument,
-    renderedHtml: fullThemeDocument,
-    themeIframe,
-    renderThemeToIframe,
-    slotRef,
+    processedHtml,
+    sanitizedHtml: processedHtml, // alias rétro-compatibilité
+    renderedHtml: processedHtml,   // alias rétro-compatibilité
     triggerAchievement
   }
 }

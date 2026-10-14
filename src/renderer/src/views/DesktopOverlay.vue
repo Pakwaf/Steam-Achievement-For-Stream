@@ -1,16 +1,18 @@
 <template>
   <div
-    class="master-overlay-container"
     v-show="isDisplaying"
+    class="master-overlay-container"
     :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
   >
-    <iframe
-      ref="themeIframe"
-      sandbox="allow-same-origin"
-      frameborder="0"
-      scrolling="no"
-      class="theme-iframe"
-    ></iframe>
+    <!-- Le CSS global du thème est injecté ici, sans DOMPurify -->
+    <component is="style" type="text/css">
+      {{ currentThemeCss }}
+    </component>
+
+    <!-- Le rendu du HTML du thème, encapsulé pour ne pas casser la vue -->
+    <div class="theme-wrapper" :class="[tierClass, fxClass]">
+      <div v-html="processedHtml" class="achievement-render-box"></div>
+    </div>
   </div>
 </template>
 
@@ -18,7 +20,10 @@
 import { useDesktopOverlay } from '../composables/useDesktopOverlay.js'
 
 const {
-  themeIframe,
+  currentThemeCss,
+  processedHtml,
+  tierClass,
+  fxClass,
   isDisplaying,
   isEntering,
   isLeaving
@@ -27,25 +32,22 @@ const {
 
 <style scoped>
 .master-overlay-container {
-  width: 100vw;
-  height: 100vh;
+  /* Fixé en bas à droite pour l'overlay In-Game */
   position: fixed;
-  top: 0;
-  left: 0;
-  margin: 0;
-  padding: 0;
-  background: transparent !important;
-  overflow: hidden;
-  pointer-events: none;
+  bottom: 20px;
+  right: 20px;
   z-index: 999999;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
-.theme-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: transparent !important;
-  pointer-events: none;
+.theme-wrapper {
+  position: relative;
+  /* Permet au CSS du thème de s'appliquer correctement dans cette boîte */
 }
 
 /* Animations de transition fluide */

@@ -28,24 +28,23 @@
       </div>
     </div>
 
+    <!-- Style universel des effets et tiers + style du thème injecté -->
+    <component is="style" type="text/css">
+      {{ safeCss }}
+    </component>
+
     <div class="preview-backdrop">
       <div class="preview-watermark">Aperçu en direct ({{ selectedPreviewTierName }})</div>
-      <!-- Isolation absolue en Iframe Sandboxée -->
-      <iframe
-        ref="previewIframe"
-        sandbox="allow-same-origin"
-        frameborder="0"
-        scrolling="no"
-        class="preview-iframe"
-        tabindex="-1"
-      ></iframe>
+      <div class="preview-slot">
+        <div v-html="processedHtml" class="achievement-preview-box"></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { buildThemeIframeDocument, writeHtmlToIframe } from '../../utils/themeDocument.js'
+import { computed } from 'vue'
+import { sanitizeSoft, sanitizeCss } from '../../utils/sanitizeSoft.js'
 
 const props = defineProps({
   selectedPreviewTier: {
@@ -72,29 +71,12 @@ const props = defineProps({
 
 defineEmits(['update:selectedPreviewTier'])
 
-const previewIframe = ref(null)
-
-const previewDocument = computed(() => {
-  return buildThemeIframeDocument({
-    html: props.previewHtml,
-    css: props.themeCss,
-    visualEffectsCss: props.visualEffectsCss,
-    tierClass: `tier-${props.selectedPreviewTier}`,
-    center: true
-  })
+const processedHtml = computed(() => {
+  return sanitizeSoft(props.previewHtml)
 })
 
-function renderToIframe() {
-  if (!previewIframe.value) return
-  writeHtmlToIframe(previewIframe.value, previewDocument.value)
-}
-
-watch(previewDocument, () => {
-  nextTick(renderToIframe)
-})
-
-onMounted(() => {
-  nextTick(renderToIframe)
+const safeCss = computed(() => {
+  return sanitizeCss(`${props.visualEffectsCss || ''}\n${props.themeCss || ''}`)
 })
 </script>
 
@@ -185,11 +167,35 @@ onMounted(() => {
   letter-spacing: 0.05em;
 }
 
-.preview-iframe {
+.preview-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  height: 220px;
-  border: none;
-  background: transparent !important;
-  pointer-events: none;
+}
+
+/* Neutralisation du positionnement fixe pour affichage parfait centré dans la zone d'aperçu */
+.preview-slot :deep(.custom-achievement-card),
+.preview-slot :deep(.cyber-achievement-card),
+.preview-slot :deep(.minimal-achievement-card),
+.preview-slot :deep(div[class*="achievement-card"]),
+.preview-slot :deep(div[class*="card"]) {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 auto !important;
+  transform: none !important;
+}
+
+.preview-slot :deep(img),
+.preview-slot :deep(.ach-icon),
+.preview-slot :deep(.mini-icon),
+.preview-slot :deep(.cyber-icon) {
+  max-width: 64px !important;
+  max-height: 64px !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
 }
 </style>
