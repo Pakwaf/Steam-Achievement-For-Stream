@@ -28,22 +28,26 @@
       </div>
     </div>
 
-    <!-- Style universel des effets et tiers + style du thème injecté -->
-    <component is="style" type="text/css">
-      {{ visualEffectsCss }}
-      {{ themeCss || '' }}
-    </component>
-
     <div class="preview-backdrop">
       <div class="preview-watermark">Aperçu en direct ({{ selectedPreviewTierName }})</div>
-      <!-- Slot d'aperçu dynamique -->
-      <div class="preview-slot" v-html="previewHtml"></div>
+      <!-- Isolation absolue en Iframe Sandboxée -->
+      <iframe
+        :srcdoc="previewDocument"
+        sandbox=""
+        frameborder="0"
+        scrolling="no"
+        class="preview-iframe"
+        tabindex="-1"
+      ></iframe>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { buildThemeIframeDocument } from '../../utils/themeDocument.js'
+
+const props = defineProps({
   selectedPreviewTier: {
     type: String,
     default: 'common'
@@ -67,6 +71,15 @@ defineProps({
 })
 
 defineEmits(['update:selectedPreviewTier'])
+
+const previewDocument = computed(() => {
+  return buildThemeIframeDocument({
+    html: props.previewHtml,
+    css: props.themeCss,
+    visualEffectsCss: props.visualEffectsCss,
+    center: true
+  })
+})
 </script>
 
 <style scoped>
@@ -156,36 +169,11 @@ defineEmits(['update:selectedPreviewTier'])
   letter-spacing: 0.05em;
 }
 
-.preview-slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.preview-iframe {
   width: 100%;
-}
-
-/* Neutralisation du positionnement fixe pour affichage centré dans la zone d'aperçu */
-.preview-slot :deep(.custom-achievement-card),
-.preview-slot :deep(.cyber-achievement-card),
-.preview-slot :deep(.minimal-achievement-card),
-.preview-slot :deep(div[class*="achievement-card"]),
-.preview-slot :deep(div[class*="card"]) {
-  position: relative !important;
-  top: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
-  margin: 0 auto !important;
-  transform: none !important;
-}
-
-/* Protection des dimensions d'icône dans l'aperçu */
-.preview-slot :deep(img),
-.preview-slot :deep(.ach-icon),
-.preview-slot :deep(.mini-icon),
-.preview-slot :deep(.cyber-icon) {
-  max-width: 64px !important;
-  max-height: 64px !important;
-  object-fit: cover !important;
-  border-radius: 10px !important;
+  height: 220px;
+  border: none;
+  background: transparent !important;
+  pointer-events: none;
 }
 </style>

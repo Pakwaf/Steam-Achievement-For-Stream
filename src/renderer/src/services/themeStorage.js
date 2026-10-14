@@ -1,7 +1,6 @@
 import { readTextFile, writeTextFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
 import { IPC_COMMANDS, STORAGE_KEYS } from '../constants/index.js'
-import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 import {
   BUILTIN_THEMES,
   DEFAULT_THEME,
@@ -36,9 +35,7 @@ function sanitizeImportedTiers(rawTiers) {
   for (const tierKey of Object.keys(cleaned)) {
     if (cleaned[tierKey] && typeof cleaned[tierKey] === 'object') {
       cleaned[tierKey].audioPath = null
-      if (cleaned[tierKey].html) {
-        cleaned[tierKey].html = sanitizeAchievementHtml(cleaned[tierKey].html)
-      }
+      cleaned[tierKey].html = cleaned[tierKey].html || ''
     }
   }
   return cleaned
@@ -515,7 +512,7 @@ class ThemeStorageService {
       const newTheme = {
         id: newId,
         name: baseName,
-        html: sanitizeAchievementHtml(raw.html),
+        html: raw.html,
         css: raw.css,
         visualEffect: raw.visualEffect || 'none',
         audioPath: null,
@@ -567,7 +564,7 @@ class ThemeStorageService {
         lib.themes.push({
           id: newId,
           name: (item.name || `Importé ${count + 1}`).trim(),
-          html: sanitizeAchievementHtml(item.html),
+          html: item.html,
           css: item.css,
           visualEffect: item.visualEffect || 'none',
           audioPath: null,

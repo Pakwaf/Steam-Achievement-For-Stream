@@ -3,7 +3,7 @@
     <iframe
       :srcdoc="srcDoc"
       class="preview-iframe"
-      sandbox="allow-same-origin"
+      sandbox=""
       tabindex="-1"
       scrolling="no"
     ></iframe>
@@ -12,6 +12,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { buildThemeIframeDocument } from '../utils/themeDocument.js'
 
 const props = defineProps({
   html: {
@@ -49,58 +50,11 @@ const renderedHtml = computed(() => {
 })
 
 const srcDoc = computed(() => {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: transparent !important;
-      overflow: hidden;
-      font-family: 'Outfit', -apple-system, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-    }
-
-    /* Neutralisation du positionnement fixe pour affichage parfait centré dans la vignette */
-    .custom-achievement-card,
-    .cyber-achievement-card,
-    .minimal-achievement-card,
-    div[class*="achievement-card"],
-    div[class*="card"] {
-      position: relative !important;
-      top: auto !important;
-      bottom: auto !important;
-      left: auto !important;
-      right: auto !important;
-      margin: 0 auto !important;
-      transform: none !important;
-    }
-
-    img, .ach-icon, .mini-icon, .cyber-icon {
-      max-width: 64px !important;
-      max-height: 64px !important;
-      object-fit: cover !important;
-      border-radius: 8px !important;
-    }
-
-    ${props.css || ''}
-  </style>
-</head>
-<body>
-  ${renderedHtml.value}
-</body>
-</html>`
+  return buildThemeIframeDocument({
+    html: renderedHtml.value,
+    css: props.css || '',
+    center: true
+  })
 })
 </script>
 

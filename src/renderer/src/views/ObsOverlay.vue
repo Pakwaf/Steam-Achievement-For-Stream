@@ -6,32 +6,27 @@
       <span>{{ isConnected ? 'OBS Connecté (ws://127.0.0.1:8080)' : 'Connexion au serveur OBS...' }}</span>
     </div>
 
-    <!-- Injection du CSS de manière isolée et sécurisée -->
-    <component is="style" type="text/css">
-      {{ currentThemeCss }}
-    </component>
-
     <!-- Zone de rendu fixe pour la notification de succès en bas à droite -->
-    <div class="master-overlay-container">
-      <div
-        v-if="isDisplaying && sanitizedHtml"
-        class="theme-container theme-effect-layer-wrapper"
-        :class="[tierClass, fxClass, { 'animate-enter': isEntering, 'animate-leave': isLeaving }]"
-      >
-        <!-- Calque d'effets visuels universel (étoiles, néon, shimmer...) -->
-        <div class="theme-effect-layer"></div>
-
-        <!-- Contenu du succès assaini via DOMPurify -->
-        <div v-html="sanitizedHtml" class="achievement-content"></div>
-      </div>
+    <div
+      v-if="isDisplaying && fullThemeDocument"
+      class="master-overlay-container"
+      :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
+    >
+      <iframe
+        :srcdoc="fullThemeDocument"
+        sandbox=""
+        frameborder="0"
+        scrolling="no"
+        class="theme-iframe"
+      ></iframe>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
 import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
+import { buildThemeIframeDocument } from '../utils/themeDocument.js'
 
 const visualEffectsCss = getVisualEffectsCss()
 
@@ -60,16 +55,10 @@ const fxClass = computed(() => {
     : ''
 })
 
-const currentThemeCss = computed(() => {
-  const baseCss = currentTheme.value.css || ''
-  return `${visualEffectsCss}\n${baseCss}`
-})
-
 const isDisplaying = ref(false)
 const isEntering = ref(false)
 const isLeaving = ref(false)
-const sanitizedHtml = ref('')
-const renderedHtml = sanitizedHtml // alias pour rétro-compatibilité
+const fullThemeDocument = ref('')
 const isConnected = ref(false)
 const showDebugBanner = ref(true)
 
@@ -161,17 +150,23 @@ function triggerAchievement(data) {
   currentTier.value = tier
   currentFx.value = currentTheme.value.visualEffect || 'none'
 
-  // 1. Remplacement des variables AVANT DOMPurify
+  // 1. Remplacement des variables du template
   const rawReplaced = replacePlaceholders(currentTheme.value.html, data)
 
-  // 2. Enrichissement avec calque et classes
+  // 2. Enrichissement avec calque et classes de rareté
   const enriched = enrichAchievementHtml(rawReplaced, {
     tier,
     visualEffect: currentFx.value
   })
 
-  // 3. Assainissement DOMPurify sans CSS
-  sanitizedHtml.value = sanitizeAchievementHtml(enriched)
+  // 3. Assemblage du document autonome pour l'iframe sandbox
+  fullThemeDocument.value = buildThemeIframeDocument({
+    html: enriched,
+    css: currentTheme.value.css || '',
+    visualEffectsCss,
+    center: false
+  })
+
   isDisplaying.value = true
   isEntering.value = true
   isLeaving.value = false
@@ -183,7 +178,7 @@ function triggerAchievement(data) {
     leaveTimer = setTimeout(() => {
       isDisplaying.value = false
       isLeaving.value = false
-      sanitizedHtml.value = ''
+      fullThemeDocument.value = ''
       currentTier.value = 'common'
       currentFx.value = 'none'
     }, 400)
@@ -346,86 +341,27 @@ onUnmounted(() => {
 
 .master-overlay-container {
   position: fixed;
-  bottom: 30px;
-  right: 30px;
+  bottom: 20px;
+  right: 20px;
+  width: 500px;
+  height: 180px;
   z-index: 9999;
   pointer-events: none;
-}
-
-/* Conteneur principal de la notification (force la boîte visuelle, fond, bordures) */
-.theme-container {
-  position: relative;
-  width: 440px;
-  max-width: calc(100vw - 60px);
-  min-height: 84px;
-  background: rgba(14, 20, 29, 0.96);
-  border-radius: 14px;
-  border: 1px solid rgba(240, 195, 48, 0.6);
-  box-shadow: 
-    0 20px 48px rgba(0, 0, 0, 0.85),
-    0 0 32px rgba(240, 195, 48, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  overflow: hidden;
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #fff;
-  user-select: none;
-  pointer-events: none;
-  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
 }
 
-.achievement-content {
+.theme-iframe {
   width: 100%;
   height: 100%;
-  position: relative;
-  z-index: 2;
-}
-
-/* Neutralisation du positionnement fixe des cartes internes */
-.master-overlay-container :deep(.custom-achievement-card),
-.master-overlay-container :deep(.cyber-achievement-card),
-.master-overlay-container :deep(.minimal-achievement-card),
-.master-overlay-container :deep(div[class*="achievement-card"]),
-.master-overlay-container :deep(div[class*="card"]) {
-  position: relative !important;
-  top: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
-  margin: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-/* Protection absolue des images d'icône : jamais géante, dimension 64x64 verrouillée */
-.achievement-content :deep(img),
-.achievement-content :deep(.ach-icon),
-.achievement-content :deep(.mini-icon),
-.achievement-content :deep(.cyber-icon) {
-  width: 64px !important;
-  height: 64px !important;
-  min-width: 64px !important;
-  min-height: 64px !important;
-  max-width: 64px !important;
-  max-height: 64px !important;
-  object-fit: cover !important;
-  border-radius: 10px !important;
-  display: block !important;
-  flex-shrink: 0 !important;
-}
-
-.achievement-content :deep(.icon-container),
-.achievement-content :deep(.cyber-icon-box) {
-  width: 64px !important;
-  height: 64px !important;
-  min-width: 64px !important;
-  min-height: 64px !important;
-  flex-shrink: 0 !important;
-  border-radius: 10px !important;
-  overflow: hidden !important;
+  border: none;
+  background: transparent !important;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 /* Animations de transition */

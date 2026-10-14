@@ -3,7 +3,7 @@ import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
 import { enrichAchievementHtml, getVisualEffectsCss } from '../utils/visualEffects.js'
-import { sanitizeAchievementHtml } from '../utils/sanitizeHtml.js'
+import { buildThemeIframeDocument } from '../utils/themeDocument.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 const FALLBACK_ICON = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
@@ -54,18 +54,19 @@ function replacePlaceholders(template, data) {
 
 /**
  * Composable pour l'Overlay transparent de bureau (Desktop Overlay).
- * Isole la souscription IPC, le moteur de rendu HTML/CSS dynamique et l'animation des succès.
+ * Isole la souscription IPC, l'assemblage de document autonome et le rendu sécurisé via Iframe Sandbox.
  */
 export function useDesktopOverlay() {
   const visualEffectsCss = getVisualEffectsCss()
   const currentTheme = ref({ ...DEFAULT_THEME })
   const activePreviewTheme = ref(null)
   const currentTierOverrideCss = ref('')
-  const sanitizedHtml = ref('')
+  const fullThemeDocument = ref('')
   const slotRef = ref(null)
 
   const currentTier = ref(ACHIEVEMENT_TIERS_KEYS.COMMON)
   const currentFx = ref('none')
+  const isDisplaying = ref(false)
   const isEntering = ref(false)
   const isLeaving = ref(false)
 
@@ -81,12 +82,12 @@ export function useDesktopOverlay() {
       : ''
   })
 
-  // CSS universel + CSS brut du thème actif + surcharges du tier (injecté via composant style)
+  // CSS universel + CSS brut du thème actif + surcharges du tier
   const currentThemeCss = computed(() => {
     const effectiveTheme = activePreviewTheme.value || currentTheme.value || DEFAULT_THEME
     const baseCss = effectiveTheme.css || DEFAULT_THEME.css || ''
     const tierCss = currentTierOverrideCss.value || ''
-    return `${visualEffectsCss}\n${baseCss}\n${tierCss}`
+    return `${baseCss}\n${tierCss}`
   })
 
   let unsubs = []
@@ -115,49 +116,45 @@ export function useDesktopOverlay() {
       ? tierHtml
       : ((baseHtml && baseHtml.trim()) ? baseHtml : DEFAULT_THEME.html)
 
-    // IMPORTANT : Remplacement des variables {title}, {description}, {icon}, {game}, {tier}, {tierLabel}, {rarity} AVANT DOMPurify
+    // 3. Remplacement des variables {title}, {description}, {icon}, {game}, {tier}, {tierLabel}, {rarity}
     const processed = replacePlaceholders(tpl, achievement)
 
-    // 3. Enrichir avec calque d'effets visuels
+    // 4. Enrichir avec calque d'effets visuels
     const enriched = enrichAchievementHtml(processed, {
       tier,
       visualEffect: effectiveTheme.visualEffect || 'none'
     })
 
-    // 4. Mettre à jour le CSS du tier actif (injecté via le composant style séparé)
+    // 5. Mettre à jour le CSS du tier actif
     const tierCss = effectiveTheme.tiers?.[tier]?.css || ''
     currentTierOverrideCss.value = tierCss
 
-    // 5. Assainir UNIQUEMENT le HTML avec DOMPurify (aucun CSS ni balise style)
-    sanitizedHtml.value = sanitizeAchievementHtml(enriched)
+    const effectiveCss = `${currentThemeCss.value}\n${tierCss}`
 
-    // 6. Animation d'entrée
-    isEntering.value = true
-    isLeaving.value = false
-    nextTick(() => {
-      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.firstElementChild
-      if (rootNode) {
-        rootNode.classList.remove('animate-leave')
-        void rootNode.offsetWidth
-        rootNode.classList.add('animate-enter')
-      }
+    // 6. Génération du document HTML complet sécurisé pour Iframe Sandbox
+    fullThemeDocument.value = buildThemeIframeDocument({
+      html: enriched,
+      css: effectiveCss,
+      visualEffectsCss,
+      center: false
     })
 
-    // 7. Animation de sortie après 5 secondes
+    // 7. Déclenchement de l'affichage et animation d'entrée
+    isDisplaying.value = true
+    isEntering.value = true
+    isLeaving.value = false
+
+    // 8. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
       isEntering.value = false
       isLeaving.value = true
-      const rootNode = slotRef.value?.querySelector('.custom-achievement-card, div[class*="card"], div[class*="achievement"]') || slotRef.value?.firstElementChild
-      if (rootNode) {
-        rootNode.classList.remove('animate-enter')
-        rootNode.classList.add('animate-leave')
-      }
 
       leaveTimer = setTimeout(() => {
-        sanitizedHtml.value = ''
+        isDisplaying.value = false
+        isLeaving.value = false
+        fullThemeDocument.value = ''
         activePreviewTheme.value = null
         currentTierOverrideCss.value = ''
-        isLeaving.value = false
         currentTier.value = ACHIEVEMENT_TIERS_KEYS.COMMON
         currentFx.value = 'none'
       }, 450)
@@ -212,12 +209,14 @@ export function useDesktopOverlay() {
     currentFx,
     tierClass,
     fxClass,
+    isDisplaying,
     isEntering,
     isLeaving,
     currentTierOverrideCss,
     currentThemeCss,
-    sanitizedHtml,
-    renderedHtml: sanitizedHtml,
+    fullThemeDocument,
+    sanitizedHtml: fullThemeDocument, // alias rétro-compatibilité
+    renderedHtml: fullThemeDocument,   // alias rétro-compatibilité
     slotRef,
     triggerAchievement
   }
