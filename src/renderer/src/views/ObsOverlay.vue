@@ -8,13 +8,13 @@
 
     <!-- Zone de rendu fixe pour la notification de succès en bas à droite -->
     <div
-      v-if="isDisplaying && fullThemeDocument"
+      v-show="isDisplaying"
       class="master-overlay-container"
       :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
     >
       <iframe
-        :srcdoc="fullThemeDocument"
-        sandbox=""
+        ref="themeIframe"
+        sandbox="allow-same-origin"
         frameborder="0"
         scrolling="no"
         class="theme-iframe"
@@ -24,9 +24,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getVisualEffectsCss, enrichAchievementHtml } from '../utils/visualEffects.js'
-import { buildThemeIframeDocument } from '../utils/themeDocument.js'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { getVisualEffectsCss } from '../utils/visualEffects.js'
+import { buildThemeIframeDocument, writeHtmlToIframe } from '../utils/themeDocument.js'
 
 const visualEffectsCss = getVisualEffectsCss()
 
@@ -59,8 +59,14 @@ const isDisplaying = ref(false)
 const isEntering = ref(false)
 const isLeaving = ref(false)
 const fullThemeDocument = ref('')
+const themeIframe = ref(null)
 const isConnected = ref(false)
 const showDebugBanner = ref(true)
+
+function renderThemeToIframe() {
+  if (!themeIframe.value) return
+  writeHtmlToIframe(themeIframe.value, fullThemeDocument.value)
+}
 
 let socket = null
 let reconnectTimer = null
@@ -153,23 +159,20 @@ function triggerAchievement(data) {
   // 1. Remplacement des variables du template
   const rawReplaced = replacePlaceholders(currentTheme.value.html, data)
 
-  // 2. Enrichissement avec calque et classes de rareté
-  const enriched = enrichAchievementHtml(rawReplaced, {
-    tier,
-    visualEffect: currentFx.value
-  })
-
-  // 3. Assemblage du document autonome pour l'iframe sandbox
+  // 2. Assemblage du document autonome pour l'iframe sandbox
   fullThemeDocument.value = buildThemeIframeDocument({
-    html: enriched,
+    html: rawReplaced,
     css: currentTheme.value.css || '',
     visualEffectsCss,
+    tierClass: tierClass.value,
+    fxClass: fxClass.value,
     center: false
   })
 
   isDisplaying.value = true
   isEntering.value = true
   isLeaving.value = false
+  nextTick(renderThemeToIframe)
 
   dismissTimer = setTimeout(() => {
     isEntering.value = false
@@ -179,6 +182,7 @@ function triggerAchievement(data) {
       isDisplaying.value = false
       isLeaving.value = false
       fullThemeDocument.value = ''
+      renderThemeToIframe()
       currentTier.value = 'common'
       currentFx.value = 'none'
     }, 400)
@@ -340,19 +344,17 @@ onUnmounted(() => {
 }
 
 .master-overlay-container {
+  width: 100vw;
+  height: 100vh;
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 500px;
-  height: 180px;
-  z-index: 9999;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  overflow: hidden;
   pointer-events: none;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  will-change: transform, opacity;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  z-index: 999999;
 }
 
 .theme-iframe {
@@ -361,7 +363,6 @@ onUnmounted(() => {
   border: none;
   background: transparent !important;
   pointer-events: none;
-  overflow: hidden;
 }
 
 /* Animations de transition */

@@ -32,8 +32,8 @@
       <div class="preview-watermark">Aperçu en direct ({{ selectedPreviewTierName }})</div>
       <!-- Isolation absolue en Iframe Sandboxée -->
       <iframe
-        :srcdoc="previewDocument"
-        sandbox=""
+        ref="previewIframe"
+        sandbox="allow-same-origin"
         frameborder="0"
         scrolling="no"
         class="preview-iframe"
@@ -44,8 +44,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { buildThemeIframeDocument } from '../../utils/themeDocument.js'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { buildThemeIframeDocument, writeHtmlToIframe } from '../../utils/themeDocument.js'
 
 const props = defineProps({
   selectedPreviewTier: {
@@ -72,13 +72,29 @@ const props = defineProps({
 
 defineEmits(['update:selectedPreviewTier'])
 
+const previewIframe = ref(null)
+
 const previewDocument = computed(() => {
   return buildThemeIframeDocument({
     html: props.previewHtml,
     css: props.themeCss,
     visualEffectsCss: props.visualEffectsCss,
+    tierClass: `tier-${props.selectedPreviewTier}`,
     center: true
   })
+})
+
+function renderToIframe() {
+  if (!previewIframe.value) return
+  writeHtmlToIframe(previewIframe.value, previewDocument.value)
+}
+
+watch(previewDocument, () => {
+  nextTick(renderToIframe)
+})
+
+onMounted(() => {
+  nextTick(renderToIframe)
 })
 </script>
 

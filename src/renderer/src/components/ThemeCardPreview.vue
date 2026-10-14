@@ -1,18 +1,19 @@
 <template>
   <div class="theme-card-preview-viewport">
     <iframe
-      :srcdoc="srcDoc"
+      ref="previewIframe"
       class="preview-iframe"
-      sandbox=""
+      sandbox="allow-same-origin"
       tabindex="-1"
       scrolling="no"
+      frameborder="0"
     ></iframe>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { buildThemeIframeDocument } from '../utils/themeDocument.js'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { buildThemeIframeDocument, writeHtmlToIframe } from '../utils/themeDocument.js'
 
 const props = defineProps({
   html: {
@@ -24,6 +25,8 @@ const props = defineProps({
     default: ''
   }
 })
+
+const previewIframe = ref(null)
 
 const fallbackIcon = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
 
@@ -55,6 +58,19 @@ const srcDoc = computed(() => {
     css: props.css || '',
     center: true
   })
+})
+
+function renderToIframe() {
+  if (!previewIframe.value) return
+  writeHtmlToIframe(previewIframe.value, srcDoc.value)
+}
+
+watch(srcDoc, () => {
+  nextTick(renderToIframe)
+})
+
+onMounted(() => {
+  nextTick(renderToIframe)
 })
 </script>
 

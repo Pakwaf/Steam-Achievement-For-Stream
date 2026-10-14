@@ -1,18 +1,16 @@
 <template>
-  <div class="desktop-overlay-container">
-    <div
-      v-if="isDisplaying && fullThemeDocument"
-      class="master-overlay-container"
-      :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
-    >
-      <iframe
-        :srcdoc="fullThemeDocument"
-        sandbox=""
-        frameborder="0"
-        scrolling="no"
-        class="theme-iframe"
-      ></iframe>
-    </div>
+  <div
+    class="master-overlay-container"
+    v-show="isDisplaying"
+    :class="{ 'animate-enter': isEntering, 'animate-leave': isLeaving }"
+  >
+    <iframe
+      ref="themeIframe"
+      sandbox="allow-same-origin"
+      frameborder="0"
+      scrolling="no"
+      class="theme-iframe"
+    ></iframe>
   </div>
 </template>
 
@@ -20,7 +18,7 @@
 import { useDesktopOverlay } from '../composables/useDesktopOverlay.js'
 
 const {
-  fullThemeDocument,
+  themeIframe,
   isDisplaying,
   isEntering,
   isLeaving
@@ -28,31 +26,18 @@ const {
 </script>
 
 <style scoped>
-.desktop-overlay-container {
+.master-overlay-container {
   width: 100vw;
   height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
   margin: 0;
   padding: 0;
   background: transparent !important;
   overflow: hidden;
   pointer-events: none;
-  position: relative;
-}
-
-.master-overlay-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 500px;
-  height: 180px;
-  z-index: 9999;
-  pointer-events: none;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  will-change: transform, opacity;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  z-index: 999999;
 }
 
 .theme-iframe {
@@ -61,7 +46,6 @@ const {
   border: none;
   background: transparent !important;
   pointer-events: none;
-  overflow: hidden;
 }
 
 /* Animations de transition fluide */

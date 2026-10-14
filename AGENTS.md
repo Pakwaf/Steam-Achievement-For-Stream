@@ -17,8 +17,7 @@ Ce fichier définit les directives obligatoires pour toute IA ou développeur in
 
 ## 2. Architecture & Clean Code
 - **Backend Rust :** Aucune logique métier dans `lib.rs` (Tauri commands minces). Tout réside dans `services/` (`ConfigService`, `ThemeService`, `ObsService`, `TrackerService`, `AudioService`, `AuthService`).
-- **Frontend Vue 3 :**
-  - Rendu sécurisé des thèmes : Utiliser exclusivement l'isolation native par iframe sandbox (`<iframe sandbox="" :srcdoc="...">`) sans `allow-scripts` pour garantir une imperméabilité XSS totale tout en préservant 100% du CSS/HTML sans dépendance à DOMPurify.
+  - Rendu sécurisé des thèmes : Utiliser l'isolation native par iframe sandbox (`<iframe sandbox="allow-same-origin" ref="...">`) avec injection directe DOM (`iframeDoc.open(); write(); close()`) sans `allow-scripts`. Cela garantit le chargement fluide des images CDN (Steam) et polices, préserve 100% de la fidélité CSS/SVG sans rognage, tout en interdisant formellement l'exécution de tout script (imperméabilité XSS).
   - Zéro magic string : utiliser les constantes de `src/renderer/src/constants/` (`IPC_EVENTS`, `IPC_COMMANDS`, `STORAGE_KEYS`, `ACHIEVEMENT_TIERS_KEYS`).
   - Composants fins (SFC amincis) : déléguer la logique métier aux composables (`useSteamTracker`, `useThemeEditor`, `useAudioEngine`, `useObsManager`, `useThemeLibrary`, `useDesktopOverlay`).
   - Performance : toujours conserver `will-change: transform, opacity;` et l'accélération GPU sur les overlays et effets visuels pour garantir 60 FPS constants.

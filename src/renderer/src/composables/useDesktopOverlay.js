@@ -3,7 +3,7 @@ import { steamAPI } from '../services/steamApi.js'
 import { DEFAULT_THEME } from '../utils/defaultTheme.js'
 import { playAchievementSound } from './useAudioEngine.js'
 import { enrichAchievementHtml, getVisualEffectsCss } from '../utils/visualEffects.js'
-import { buildThemeIframeDocument } from '../utils/themeDocument.js'
+import { buildThemeIframeDocument, writeHtmlToIframe } from '../utils/themeDocument.js'
 import { ACHIEVEMENT_TIERS_KEYS } from '../constants/index.js'
 
 const FALLBACK_ICON = 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg'
@@ -54,7 +54,7 @@ function replacePlaceholders(template, data) {
 
 /**
  * Composable pour l'Overlay transparent de bureau (Desktop Overlay).
- * Isole la souscription IPC, l'assemblage de document autonome et le rendu sécurisé via Iframe Sandbox.
+ * Isole la souscription IPC, l'assemblage de document autonome et l'injection directe sécurisée dans l'iframe.
  */
 export function useDesktopOverlay() {
   const visualEffectsCss = getVisualEffectsCss()
@@ -62,6 +62,7 @@ export function useDesktopOverlay() {
   const activePreviewTheme = ref(null)
   const currentTierOverrideCss = ref('')
   const fullThemeDocument = ref('')
+  const themeIframe = ref(null)
   const slotRef = ref(null)
 
   const currentTier = ref(ACHIEVEMENT_TIERS_KEYS.COMMON)
@@ -133,9 +134,11 @@ export function useDesktopOverlay() {
 
     // 6. Génération du document HTML complet sécurisé pour Iframe Sandbox
     fullThemeDocument.value = buildThemeIframeDocument({
-      html: enriched,
+      html: processed,
       css: effectiveCss,
       visualEffectsCss,
+      tierClass: tierClass.value,
+      fxClass: fxClass.value,
       center: false
     })
 
@@ -143,6 +146,7 @@ export function useDesktopOverlay() {
     isDisplaying.value = true
     isEntering.value = true
     isLeaving.value = false
+    nextTick(renderThemeToIframe)
 
     // 8. Animation de sortie après 5 secondes
     dismissTimer = setTimeout(() => {
@@ -153,12 +157,18 @@ export function useDesktopOverlay() {
         isDisplaying.value = false
         isLeaving.value = false
         fullThemeDocument.value = ''
+        renderThemeToIframe()
         activePreviewTheme.value = null
         currentTierOverrideCss.value = ''
         currentTier.value = ACHIEVEMENT_TIERS_KEYS.COMMON
         currentFx.value = 'none'
       }, 450)
     }, 5000)
+  }
+
+  function renderThemeToIframe() {
+    if (!themeIframe.value) return
+    writeHtmlToIframe(themeIframe.value, fullThemeDocument.value)
   }
 
   onMounted(async () => {
@@ -187,6 +197,8 @@ export function useDesktopOverlay() {
       triggerAchievement(achievement)
     })
     unsubs.push(unsubAch)
+
+    nextTick(renderThemeToIframe)
   })
 
   onUnmounted(() => {
@@ -215,8 +227,10 @@ export function useDesktopOverlay() {
     currentTierOverrideCss,
     currentThemeCss,
     fullThemeDocument,
-    sanitizedHtml: fullThemeDocument, // alias rétro-compatibilité
-    renderedHtml: fullThemeDocument,   // alias rétro-compatibilité
+    sanitizedHtml: fullThemeDocument,
+    renderedHtml: fullThemeDocument,
+    themeIframe,
+    renderThemeToIframe,
     slotRef,
     triggerAchievement
   }
