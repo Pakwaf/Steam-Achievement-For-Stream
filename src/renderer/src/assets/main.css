@@ -65,6 +65,38 @@ body:not(.transparent-view) {
     radial-gradient(circle at 85% 80%, rgba(20, 100, 150, 0.15) 0%, transparent 45%) !important;
 }
 
+/* Mode Clair de l'application (paramétrable dans Général / Application) */
+body.light-theme:not(.transparent-view) {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card-hover: rgba(241, 245, 249, 0.98);
+  --border-color: rgba(148, 163, 184, 0.25);
+  --border-color-active: rgba(25, 153, 227, 0.6);
+  --steam-text-main: #0f172a;
+  --steam-text-muted: #475569;
+  background-color: #f1f5f9 !important;
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(102, 192, 244, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(25, 153, 227, 0.08) 0%, transparent 45%) !important;
+}
+
+body.light-theme .theme-card,
+body.light-theme .builder-card,
+body.light-theme .settings-block,
+body.light-theme .api-key-modal-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+body.light-theme .block-title,
+body.light-theme .card-section-title,
+body.light-theme .theme-card-title,
+body.light-theme .modal-title-group h3 {
+  color: #0f172a;
+}
+
 /* Scrollbar personnalisée */
 ::-webkit-scrollbar {
   width: 8px;
@@ -104,4 +136,17 @@ body.transparent-view #app {
   backface-visibility: hidden;
   transform: var(--gpu-layer);
   will-change: transform, opacity;
+}
+
+/* Positionnement universel de l'overlay Steam en bas à droite */
+.master-overlay-container {
+  position: fixed !important;
+  bottom: 40px !important;
+  right: 40px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: flex-end !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
 }

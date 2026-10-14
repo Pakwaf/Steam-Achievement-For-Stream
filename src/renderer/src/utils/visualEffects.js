@@ -73,6 +73,7 @@ export const ACHIEVEMENT_TIERS = {
     defaultDesc: 'Félicitations ! Vous avez débloqué tous les succès de ce jeu !',
     defaultGame: 'Vampire Survivors',
     defaultPercent: 1.2,
+    defaultPlaytime: 142.5,
     icon: 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg',
     color: '#38bdf8'
   }

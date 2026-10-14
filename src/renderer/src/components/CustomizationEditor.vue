@@ -55,8 +55,18 @@
         </div>
       </div>
 
-      <!-- Boutons de test : simulation pour chaque Tier -->
+      <!-- Boutons de test : simulation pour chaque Tier et Test de Brouillon Live -->
       <div class="header-actions">
+        <button
+          class="btn-live-draft-test"
+          :disabled="isTestingDraft"
+          title="Diffuser immédiatement ce brouillon en cours sur l'écran et OBS sans sauvegarder"
+          @click="testDraftLive()"
+        >
+          <span v-if="isTestingDraft">⏳ Envoi...</span>
+          <span v-else>🚀 Tester ce brouillon (Live)</span>
+        </button>
+
         <div class="tier-test-btn-group">
           <button
             class="btn-tier-test common"
@@ -132,6 +142,15 @@
 
       <div class="theme-actions-inline">
         <span v-if="saveMessage" class="save-status-pill">{{ saveMessage }}</span>
+        <button
+          class="btn-live-draft-mini"
+          :disabled="isTestingDraft"
+          title="Diffuser immédiatement ce brouillon en cours sur l'écran et OBS sans sauvegarder"
+          @click="testDraftLive()"
+        >
+          <span v-if="isTestingDraft">⏳ Test...</span>
+          <span v-else>🚀 Tester ce brouillon (Live)</span>
+        </button>
         <button class="btn-export-theme" title="Télécharger ce thème en fichier .json" @click="exportCurrentTheme">
           💾 Exporter
         </button>
@@ -281,6 +300,22 @@
               <code>{tierLabel}</code>
               <span>Badge texte (ex: SUCCÈS RARE)</span>
             </button>
+            <button
+              class="placeholder-chip"
+              title="Cliquer pour insérer {rarity}"
+              @click="insertPlaceholder('{rarity}')"
+            >
+              <code>{rarity}</code>
+              <span>Rareté mondiale (ex: 4.8%)</span>
+            </button>
+            <button
+              class="placeholder-chip"
+              title="Cliquer pour insérer {playtime}"
+              @click="insertPlaceholder('{playtime}')"
+            >
+              <code>{playtime}</code>
+              <span>Temps de jeu Platine (ex: 142.5h)</span>
+            </button>
           </div>
         </div>
       </div>
@@ -369,6 +404,7 @@ const {
   previewHtml,
   isSaving,
   isTesting,
+  isTestingDraft,
   isPlayingSound,
   saveMessage,
   htmlTextarea,
@@ -386,6 +422,7 @@ const {
   saveCustomization,
   resetToDefault,
   triggerTierTest,
+  testDraftLive,
   exportCurrentTheme
 } = useThemeEditor(props, emit)
 
@@ -587,6 +624,63 @@ function activateCurrentTheme() {
   background: rgba(255, 255, 255, 0.05);
   padding: 0.25rem 0.55rem;
   border-radius: 6px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.btn-live-draft-test {
+  background: rgba(102, 192, 244, 0.15);
+  border: 1px solid rgba(102, 192, 244, 0.45);
+  color: #66c0f4;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 12px rgba(102, 192, 244, 0.15);
+}
+
+.btn-live-draft-test:hover:not(:disabled) {
+  background: rgba(102, 192, 244, 0.28);
+  border-color: #66c0f4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(102, 192, 244, 0.35);
+}
+
+.btn-live-draft-test:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-live-draft-mini {
+  background: rgba(102, 192, 244, 0.12);
+  border: 1px solid rgba(102, 192, 244, 0.4);
+  color: #66c0f4;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-live-draft-mini:hover:not(:disabled) {
+  background: rgba(102, 192, 244, 0.24);
+  border-color: #66c0f4;
+  transform: translateY(-1px);
+}
+
+.btn-live-draft-mini:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tier-test-btn-group {

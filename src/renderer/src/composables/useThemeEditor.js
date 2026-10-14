@@ -197,6 +197,11 @@ export function useThemeEditor(props, emit) {
       icon = icon.replace('http://', 'https://')
     }
 
+    const rawPlaytime = activeTier === ACHIEVEMENT_TIERS_KEYS.MASTER ? (tierMeta.defaultPlaytime || 142.5) : null
+    const playtimeStr = (rawPlaytime !== null && rawPlaytime !== undefined && rawPlaytime !== '')
+      ? `${rawPlaytime}h`
+      : ''
+
     let html = htmlTemplate
       .replace(/\{title\}/gi, tierMeta.defaultTitle)
       .replace(/\{description\}/gi, tierMeta.defaultDesc)
@@ -209,6 +214,7 @@ export function useThemeEditor(props, emit) {
       .replace(/\{tier\}/gi, activeTier)
       .replace(/\{tierLabel\}/gi, tierMeta.defaultBadge)
       .replace(/\{rarity\}/gi, tierMeta.defaultPercent + '%')
+      .replace(/\{playtime\}/gi, playtimeStr)
 
     if (activeTier !== ACHIEVEMENT_TIERS_KEYS.COMMON) {
       html = html.replace(/SUCCÈS DÉBLOQUÉ/g, tierMeta.defaultBadge)
@@ -358,6 +364,8 @@ export function useThemeEditor(props, emit) {
         icon: tierMeta.icon,
         tier,
         rarityPercent: tierMeta.defaultPercent,
+        playtimeHours: tier === ACHIEVEMENT_TIERS_KEYS.MASTER ? (tierMeta.defaultPlaytime || 142.5) : null,
+        playtime_hours: tier === ACHIEVEMENT_TIERS_KEYS.MASTER ? (tierMeta.defaultPlaytime || 142.5) : null,
         previewTheme: {
           id: theme.value.id,
           name: theme.value.name,
@@ -377,6 +385,55 @@ export function useThemeEditor(props, emit) {
       setTimeout(() => {
         isTesting.value = false
       }, 1500)
+    }
+  }
+
+  const isTestingDraft = ref(false)
+
+  // Diffuse le brouillon exact en direct sur l'overlay bureau et OBS sans modifier la BDD
+  async function testDraftLive(forcedTier = null) {
+    if (isTestingDraft.value) return
+    isTestingDraft.value = true
+
+    const tier = forcedTier || selectedPreviewTier.value || selectedEditingTier.value || ACHIEVEMENT_TIERS_KEYS.COMMON
+    const tierMeta = ACHIEVEMENT_TIERS[tier] || ACHIEVEMENT_TIERS.common
+
+    playAchievementSound({
+      soundEnabled: theme.value.soundEnabled,
+      soundVolume: theme.value.soundVolume,
+      audioPath: currentEditingAudioPath.value || theme.value.audioPath,
+      audioDeviceId: theme.value.audioDeviceId,
+      tiers: theme.value.tiers
+    }, tier)
+
+    try {
+      const activeHtml = (tier !== ACHIEVEMENT_TIERS_KEYS.COMMON && theme.value.tiers?.[tier]?.html)
+        ? theme.value.tiers[tier].html
+        : theme.value.html
+
+      const activeCss = theme.value.css || ''
+
+      await steamAPI.broadcastDraftAchievement({
+        displayName: tierMeta.defaultTitle,
+        description: tierMeta.defaultDesc,
+        gameName: tierMeta.defaultGame,
+        icon: tierMeta.icon,
+        tier,
+        rarityPercent: tierMeta.defaultPercent,
+        html: activeHtml,
+        css: activeCss,
+        visualEffect: theme.value.visualEffect || 'none',
+        audioPath: theme.value.audioPath,
+        tiers: theme.value.tiers || {}
+      })
+      showStatus(`🚀 Brouillon (${tierMeta.name}) diffusé en direct (5s)`)
+    } catch (err) {
+      console.error('[useThemeEditor] Erreur broadcastDraftAchievement:', err)
+      showStatus('Erreur diffusion brouillon ✖')
+    } finally {
+      setTimeout(() => {
+        isTestingDraft.value = false
+      }, 1200)
     }
   }
 
@@ -418,6 +475,7 @@ export function useThemeEditor(props, emit) {
     previewHtml,
     isSaving,
     isTesting,
+    isTestingDraft,
     isPlayingSound,
     saveMessage,
     htmlTextarea,
@@ -435,6 +493,7 @@ export function useThemeEditor(props, emit) {
     saveCustomization,
     resetToDefault,
     triggerTierTest,
+    testDraftLive,
     exportCurrentTheme
   }
 }

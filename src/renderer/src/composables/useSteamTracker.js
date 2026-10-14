@@ -193,6 +193,8 @@ export function useSteamTracker() {
         icon: meta.icon,
         tier,
         rarityPercent: meta.defaultPercent,
+        playtimeHours: tier === ACHIEVEMENT_TIERS_KEYS.MASTER ? 142.5 : null,
+        playtime_hours: tier === ACHIEVEMENT_TIERS_KEYS.MASTER ? 142.5 : null,
         unlockedAt: new Date().toISOString(),
         isTest: true
       })

@@ -71,6 +71,18 @@ async fn broadcast_test_achievement(
 }
 
 #[tauri::command]
+async fn broadcast_draft_achievement(
+    state: State<'_, AppState>,
+    draft_data: serde_json::Value,
+) -> Result<bool, String> {
+    state
+        .tracker_service
+        .broadcast_draft_achievement(draft_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_steam_api_key(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     state.auth_service.get_steam_api_key().await.map_err(|e| e.to_string())
 }
@@ -186,6 +198,7 @@ pub fn run() {
             get_obs_status,
             simulate_achievement,
             broadcast_test_achievement,
+            broadcast_draft_achievement,
             get_steam_api_key,
             save_steam_api_key,
             get_theme_library,

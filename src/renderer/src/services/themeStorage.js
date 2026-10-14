@@ -4,25 +4,26 @@ import { IPC_COMMANDS, STORAGE_KEYS } from '../constants/index.js'
 import {
   BUILTIN_THEMES,
   DEFAULT_THEME,
-  STEAM_GOLD_THEME,
-  COZY_PIXEL_THEME,
-  HORROR_THEME,
-  DARK_FANTASY_THEME,
-  FRUTIGER_AERO_THEME
+  STEAM_GOLD_THEME
 } from '../themes/index.js'
 
 // Re-export des thèmes pour rétro-compatibilité
 export {
   BUILTIN_THEMES,
   DEFAULT_THEME,
-  STEAM_GOLD_THEME,
-  COZY_PIXEL_THEME,
-  HORROR_THEME,
-  DARK_FANTASY_THEME,
-  FRUTIGER_AERO_THEME
+  STEAM_GOLD_THEME
 }
 
-export const DEPRECATED_THEME_IDS = ['theme-minimal', 'theme-cyberpunk', 'theme-wii', 'theme-pokemon']
+export const DEPRECATED_THEME_IDS = [
+  'theme-minimal',
+  'theme-cyberpunk',
+  'theme-wii',
+  'theme-pokemon',
+  'theme-cozy',
+  'theme-horror',
+  'theme-dark-fantasy',
+  'theme-frutiger-aero'
+]
 const THEMES_FILENAME = 'themes.json'
 
 /**
@@ -145,13 +146,15 @@ class ThemeStorageService {
         if (deletedIds.includes(builtin.id)) {
           continue
         }
-        const existsInLoaded = loaded.themes.some((t) => t.id === builtin.id)
-        if (!existsInLoaded) {
+        const existingTheme = loaded.themes.find((t) => t.id === builtin.id)
+        if (!existingTheme) {
           loaded.themes.push({
             ...builtin,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           })
+        } else if (builtin.tiers && (!existingTheme.tiers || Object.keys(existingTheme.tiers).length === 0)) {
+          existingTheme.tiers = JSON.parse(JSON.stringify(builtin.tiers))
         }
       }
 
@@ -403,7 +406,7 @@ class ThemeStorageService {
 
   async restoreDefaultThemes() {
     const lib = await this.loadLibrary()
-    lib.deletedThemeIds = []
+    lib.deletedThemeIds = [...DEPRECATED_THEME_IDS]
     const now = new Date().toISOString()
     for (const builtin of BUILTIN_THEMES) {
       const exists = lib.themes.some((t) => t.id === builtin.id)

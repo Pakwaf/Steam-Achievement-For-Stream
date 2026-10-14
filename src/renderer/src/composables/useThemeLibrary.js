@@ -86,13 +86,13 @@ export function useThemeLibrary() {
   }
 
   async function handleRestoreDefaultThemes() {
-    if (!confirm('Voulez-vous restaurer tous les thèmes officiels par défaut (Steam Gold, Cozy Pixel, Horror, Dark Fantasy, Frutiger Aero) ? Vos thèmes créés seront conservés.')) return
+    if (!confirm('Voulez-vous restaurer le thème officiel Steam Gold ? Vos thèmes créés seront conservés.')) return
 
     try {
       const res = await steamAPI.restoreDefaultThemes()
       if (res.success) {
         themeLibrary.value = res.library
-        showLibraryStatus('Thèmes officiels par défaut restaurés avec succès ✔')
+        showLibraryStatus('Thème officiel Steam Gold restauré avec succès ✔')
       }
     } catch (err) {
       console.error('[useThemeLibrary] Erreur restauration thèmes:', err)
@@ -141,6 +141,26 @@ export function useThemeLibrary() {
     }
   }
 
+  const showCreateChoiceModal = ref(false)
+
+  function handleCreateNewThemeClick() {
+    showCreateChoiceModal.value = true
+  }
+
+  function closeCreateChoiceModal() {
+    showCreateChoiceModal.value = false
+  }
+
+  function selectQuickBuilder() {
+    showCreateChoiceModal.value = false
+    currentView.value = 'quick-builder'
+  }
+
+  function selectCustomEditor() {
+    showCreateChoiceModal.value = false
+    handleCreateNewTheme()
+  }
+
   async function handleCreateNewTheme() {
     try {
       const defaultName = `Nouveau Thème (${themeLibrary.value.themes.length + 1})`
@@ -159,6 +179,18 @@ export function useThemeLibrary() {
   function closeEditor() {
     currentView.value = 'library'
     editingTheme.value = null
+    fetchThemeLibrary()
+  }
+
+  function closeQuickBuilder() {
+    currentView.value = 'library'
+    fetchThemeLibrary()
+  }
+
+  function onQuickThemeSaved(savedTheme) {
+    if (savedTheme) {
+      showLibraryStatus(`Thème "${savedTheme.name}" créé avec succès via le Générateur Visuel ! 🎉`)
+    }
     fetchThemeLibrary()
   }
 
@@ -206,6 +238,13 @@ export function useThemeLibrary() {
     handleExportTheme,
     handleExportLibrary,
     handleCreateNewTheme,
+    showCreateChoiceModal,
+    handleCreateNewThemeClick,
+    closeCreateChoiceModal,
+    selectQuickBuilder,
+    selectCustomEditor,
+    closeQuickBuilder,
+    onQuickThemeSaved,
     closeEditor,
     onEditorThemeSaved
   }
