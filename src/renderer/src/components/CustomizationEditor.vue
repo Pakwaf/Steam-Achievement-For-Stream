@@ -228,115 +228,22 @@
       />
     </div>
 
-    <!-- 1. Onglet HTML -->
+    <!-- 1. Onglet HTML (Sous-composant modulaire) -->
     <div v-show="activeTab === 'html'" class="tab-pane">
-      <div class="editor-pane-layout">
-        <div class="editor-column">
-          <div class="code-editor-header">
-            <span class="editor-label">Structure HTML — {{ selectedEditingTierName }}</span>
-            <span class="editor-hint">
-              {{ selectedEditingTier === 'common' ? 'Modèle principal par défaut' : (hasTierCustomization(selectedEditingTier) ? 'Modèle personnalisé pour ce tier' : 'Hérite du HTML standard') }}
-            </span>
-          </div>
-          <textarea
-            ref="htmlTextarea"
-            v-model="currentEditingHtml"
-            class="code-textarea html-mode"
-            spellcheck="false"
-            placeholder="<div>...</div>"
-          ></textarea>
-        </div>
-
-        <div class="help-sidebar">
-          <h4>Balises Disponibles</h4>
-          <p class="help-sub">Ces variables seront automatiquement remplacées lors d'un déblocage de succès :</p>
-
-          <div class="placeholders-list">
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {title}"
-              @click="insertPlaceholder('{title}')"
-            >
-              <code>{title}</code>
-              <span>Titre officiel du succès</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {description}"
-              @click="insertPlaceholder('{description}')"
-            >
-              <code>{description}</code>
-              <span>Description / objectif</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {icon}"
-              @click="insertPlaceholder('{icon}')"
-            >
-              <code>{icon}</code>
-              <span>URL de l'image (icône 64x64)</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {game}"
-              @click="insertPlaceholder('{game}')"
-            >
-              <code>{game}</code>
-              <span>Nom du jeu Steam</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {tier}"
-              @click="insertPlaceholder('{tier}')"
-            >
-              <code>{tier}</code>
-              <span>common, rare ou master</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {tierLabel}"
-              @click="insertPlaceholder('{tierLabel}')"
-            >
-              <code>{tierLabel}</code>
-              <span>Badge texte (ex: SUCCÈS RARE)</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {rarity}"
-              @click="insertPlaceholder('{rarity}')"
-            >
-              <code>{rarity}</code>
-              <span>Rareté mondiale (ex: 4.8%)</span>
-            </button>
-            <button
-              class="placeholder-chip"
-              title="Cliquer pour insérer {playtime}"
-              @click="insertPlaceholder('{playtime}')"
-            >
-              <code>{playtime}</code>
-              <span>Temps de jeu Platine (ex: 142.5h)</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <EditorHtmlTab
+        v-model="currentEditingHtml"
+        :selected-tier-name="selectedEditingTierName"
+        :tier-hint="selectedEditingTier === 'common' ? 'Modèle principal par défaut' : (hasTierCustomization(selectedEditingTier) ? 'Modèle personnalisé pour ce tier' : 'Hérite du HTML standard')"
+      />
     </div>
 
-    <!-- 2. Onglet CSS -->
+    <!-- 2. Onglet CSS (Sous-composant modulaire) -->
     <div v-show="activeTab === 'css'" class="tab-pane">
-      <div class="editor-column">
-        <div class="code-editor-header">
-          <span class="editor-label">Styles CSS — {{ selectedEditingTierName }}</span>
-          <span class="editor-hint">
-            {{ selectedEditingTier === 'common' ? 'Feuille de style principale du thème' : 'Règles CSS spécifiques injectées pour ce tier' }}
-          </span>
-        </div>
-        <textarea
-          v-model="currentEditingCss"
-          class="code-textarea css-mode"
-          spellcheck="false"
-          placeholder=".achievement-card { ... }"
-        ></textarea>
-      </div>
+      <EditorCssTab
+        v-model="currentEditingCss"
+        :selected-tier-name="selectedEditingTierName"
+        :tier-hint="selectedEditingTier === 'common' ? 'Feuille de style principale du thème' : 'Règles CSS spécifiques injectées pour ce tier'"
+      />
     </div>
 
     <!-- 3. Onglet Audio -->
@@ -370,6 +277,8 @@
 
 <script setup>
 import EditorEffectsTab from './editor/EditorEffectsTab.vue'
+import EditorHtmlTab from './editor/EditorHtmlTab.vue'
+import EditorCssTab from './editor/EditorCssTab.vue'
 import EditorAudioTab from './editor/EditorAudioTab.vue'
 import EditorPreviewTab from './editor/EditorPreviewTab.vue'
 import { useThemeEditor } from '../composables/index.js'
@@ -979,119 +888,5 @@ function activateCurrentTheme() {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-.editor-pane-layout {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 1.5rem;
-}
-
-@media (max-width: 900px) {
-  .editor-pane-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.editor-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.code-editor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.editor-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #e5effa;
-}
-
-.editor-hint {
-  font-size: 0.72rem;
-  color: #7d8ea6;
-}
-
-.code-textarea {
-  background: rgba(10, 15, 22, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 1rem;
-  color: #e0ecf8;
-  font-family: monospace;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  min-height: 380px;
-  resize: vertical;
-  outline: none;
-}
-
-.code-textarea:focus {
-  border-color: #66c0f4;
-  box-shadow: 0 0 14px rgba(102, 192, 244, 0.15);
-}
-
-.code-textarea.css-mode {
-  min-height: 440px;
-}
-
-.help-sidebar {
-  background: rgba(12, 18, 26, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 1.25rem;
-}
-
-.help-sidebar h4 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #fff;
-  margin: 0 0 0.3rem 0;
-}
-
-.help-sub {
-  font-size: 0.76rem;
-  color: #8b9bb4;
-  margin: 0 0 1rem 0;
-  line-height: 1.4;
-}
-
-.placeholders-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.placeholder-chip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s ease;
-}
-
-.placeholder-chip:hover {
-  background: rgba(102, 192, 244, 0.1);
-  border-color: rgba(102, 192, 244, 0.35);
-}
-
-.placeholder-chip code {
-  color: #66c0f4;
-  font-size: 0.8rem;
-  font-family: monospace;
-  font-weight: 700;
-}
-
-.placeholder-chip span {
-  font-size: 0.72rem;
-  color: #8b9bb4;
-}
 </style>
+

@@ -423,14 +423,32 @@ impl ObsServer {
 
         let state = self.clone();
 
-        // Sécurité CORS stricte : seuls les clients locaux (loopback / WebView Tauri) sont autorisés
+        // Sécurité CORS : clients locaux (loopback / WebView Tauri) et LAN si activé
+        let is_lan_mode = is_lan;
         let cors = CorsLayer::new()
-            .allow_origin(AllowOrigin::predicate(|origin, _| {
+            .allow_origin(AllowOrigin::predicate(move |origin, _| {
                 if let Ok(s) = origin.to_str() {
-                    s.starts_with("http://127.0.0.1")
+                    let is_local = s.starts_with("http://127.0.0.1")
                         || s.starts_with("http://localhost")
                         || s.starts_with("tauri://localhost")
-                        || s.starts_with("http://tauri.localhost")
+                        || s.starts_with("http://tauri.localhost");
+                    if is_local {
+                        return true;
+                    }
+
+                    if is_lan_mode {
+                        let stripped = s
+                            .trim_start_matches("http://")
+                            .trim_start_matches("https://");
+                        if stripped.starts_with("192.168.")
+                            || stripped.starts_with("10.")
+                            || (16..=31).any(|b| stripped.starts_with(&format!("172.{}.", b)))
+                        {
+                            return true;
+                        }
+                    }
+
+                    false
                 } else {
                     false
                 }
@@ -1237,6 +1255,23 @@ async fn audio_handler(
 
         // Vérifier que le chemin correspond bien à un fichier réel existant
         if path.is_file() {
+            const MAX_AUDIO_BYTES: u64 = 20 * 1024 * 1024; // 20 Mo max
+            if let Ok(meta) = tokio::fs::metadata(&path).await {
+                if meta.len() > MAX_AUDIO_BYTES {
+                    eprintln!(
+                        "[ObsServer] 🚨 Fichier audio trop volumineux ({} octets > 20 Mo max) : {:?}",
+                        meta.len(),
+                        path
+                    );
+                    return (
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+                        "Fichier audio trop volumineux : la taille maximale autorisée est de 20 Mo.",
+                    )
+                        .into_response();
+                }
+            }
+
             if let Ok(bytes) = tokio::fs::read(&path).await {
                 let mime = match ext.as_str() {
                     "wav" => "audio/wav",

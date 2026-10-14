@@ -411,22 +411,51 @@ impl AchievementTracker {
             None => return,
         };
 
-        let mut known_guard = self.known_unlocked.write().await;
-        let entry = known_guard
-            .entry(app_id.to_string())
-            .or_insert_with(HashSet::new);
-
         if is_initial {
+            let mut initial_set = HashSet::new();
             for a in achievements {
                 if a.get("achieved").and_then(|v| v.as_i64()).unwrap_or(0) == 1 {
                     if let Some(apiname) = a.get("apiname").and_then(|v| v.as_str()) {
-                        entry.insert(apiname.to_lowercase());
+                        initial_set.insert(apiname.to_lowercase());
                     }
                 }
             }
+            let mut known_guard = self.known_unlocked.write().await;
+            known_guard.insert(app_id.to_string(), initial_set);
             return;
         }
 
+        // 1. Filtrage rapide des nouveaux succès débloqués (verrou en lecture ultra-court)
+        let new_unlocked_items: Vec<(String, String, Option<String>, Option<String>)> = {
+            let known_guard = self.known_unlocked.read().await;
+            let empty_set = HashSet::new();
+            let entry = known_guard.get(app_id).unwrap_or(&empty_set);
+
+            let mut items = Vec::new();
+            for a in achievements {
+                let achieved = a.get("achieved").and_then(|v| v.as_i64()).unwrap_or(0);
+                if achieved == 1 {
+                    if let Some(apiname) = a.get("apiname").and_then(|v| v.as_str()) {
+                        let code_lower = apiname.to_lowercase();
+                        if !entry.contains(&code_lower) {
+                            items.push((
+                                apiname.to_string(),
+                                code_lower,
+                                a.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                                a.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                            ));
+                        }
+                    }
+                }
+            }
+            items
+        }; // <- Verrou known_unlocked relâché immédiatement ici !
+
+        if new_unlocked_items.is_empty() {
+            return;
+        }
+
+        // 2. Traitement asynchrone hors de tout verrou (appels réseau HTTP Steam)
         let total_achievements = achievements.len();
         let achieved_count = achievements
             .iter()
@@ -439,37 +468,40 @@ impl AchievementTracker {
             master_playtime = self.fetch_game_playtime_hours(app_id, &key, &sid).await;
         }
 
-        // Vérification des nouveaux succès débloqués
-        for a in achievements {
-            let achieved = a.get("achieved").and_then(|v| v.as_i64()).unwrap_or(0);
-            if achieved == 1 {
-                if let Some(apiname) = a.get("apiname").and_then(|v| v.as_str()) {
-                    let code_lower = apiname.to_lowercase();
-                    if !entry.contains(&code_lower) {
-                        entry.insert(code_lower.clone());
+        let mut resolved_achievements = Vec::new();
+        for (apiname, code_lower, provided_name, provided_desc) in new_unlocked_items {
+            let mut meta = self
+                .resolve_achievement_metadata(
+                    app_id,
+                    &apiname,
+                    provided_name.as_deref(),
+                    provided_desc.as_deref(),
+                )
+                .await;
 
-                        let provided_name = a.get("name").and_then(|v| v.as_str());
-                        let provided_desc = a.get("description").and_then(|v| v.as_str());
-
-                        let mut meta = self
-                            .resolve_achievement_metadata(
-                                app_id,
-                                apiname,
-                                provided_name,
-                                provided_desc,
-                            )
-                            .await;
-
-                        if is_master {
-                            meta.tier = Some("master".to_string());
-                            meta.playtime_hours = master_playtime;
-                        }
-
-                        let _ = app.emit("steam:achievement-unlocked", &meta);
-                        obs.broadcast_achievement(&meta);
-                    }
-                }
+            if is_master {
+                meta.tier = Some("master".to_string());
+                meta.playtime_hours = master_playtime;
             }
+
+            resolved_achievements.push((code_lower, meta));
+        }
+
+        // 3. Mise à jour atomique ultra-courte de known_unlocked
+        {
+            let mut known_guard = self.known_unlocked.write().await;
+            let entry = known_guard
+                .entry(app_id.to_string())
+                .or_insert_with(HashSet::new);
+            for (code_lower, _) in &resolved_achievements {
+                entry.insert(code_lower.clone());
+            }
+        } // <- Verrou known_unlocked relâché immédiatement
+
+        // 4. Émission et diffusion des événements (hors de tout verrou)
+        for (_, meta) in resolved_achievements {
+            let _ = app.emit("steam:achievement-unlocked", &meta);
+            obs.broadcast_achievement(&meta);
         }
     }
 

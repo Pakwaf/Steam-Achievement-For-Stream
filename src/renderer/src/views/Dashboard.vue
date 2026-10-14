@@ -400,9 +400,6 @@ function closeApiKeyModal() {
 
 async function saveApiKeyFromModal(newKey) {
   steamApiKey.value = newKey
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEYS.STEAM_API_KEY, newKey)
-  }
   await steamAPI.saveSteamApiKey(newKey)
   showApiKeyModal.value = false
 }
